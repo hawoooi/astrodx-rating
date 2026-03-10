@@ -620,6 +620,36 @@ function renderB50() {
   tbody.appendChild(fragment);
 }
 
+async function exportB50Image() {
+  const btn = document.getElementById("b50-export");
+  const capture = document.getElementById("b50-capture");
+
+  btn.disabled = true;
+  btn.textContent = "Exporting...";
+
+  // Temporarily add exporting class for background/padding
+  capture.classList.add("exporting");
+
+  try {
+    const canvas = await html2canvas(capture, {
+      backgroundColor: "#1a1a2e",
+      scale: 2,
+    });
+
+    const link = document.createElement("a");
+    link.download = "best50.png";
+    link.href = canvas.toDataURL("image/png");
+    link.click();
+  } catch (err) {
+    console.error("Export failed:", err);
+    alert("Export failed. Check console for details.");
+  } finally {
+    capture.classList.remove("exporting");
+    btn.disabled = false;
+    btn.textContent = "Export as Image";
+  }
+}
+
 function switchTab(tab) {
   activeTab = tab;
   document.querySelectorAll(".tab").forEach(t => {
@@ -686,6 +716,9 @@ function setupEvents() {
     b50Combined = e.target.value === "combined";
     if (allScores.length > 0) renderB50();
   });
+
+  // B50 export
+  document.getElementById("b50-export").addEventListener("click", exportB50Image);
 
   // Column sort
   document.querySelectorAll("#score-table th[data-col]").forEach(th => {

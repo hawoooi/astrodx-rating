@@ -259,6 +259,27 @@ header h1 {
   color: #666;
 }
 
+/* Export button */
+#b50-export {
+  background: #7c5cbf;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 0.4rem 1rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+#b50-export:hover { background: #9370db; }
+#b50-export:disabled { background: #555; cursor: wait; }
+
+/* Capture area — add padding/bg when exporting */
+#b50-capture.exporting {
+  background: #1a1a2e;
+  padding: 1.5rem;
+}
+
 /* Misc */
 .hidden { display: none !important; }
 .text-right { text-align: right; }

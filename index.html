@@ -6,6 +6,7 @@
   <title>AstroDX Rating Viewer</title>
   <link rel="stylesheet" href="style.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
 <body>
   <header>
@@ -94,8 +95,10 @@
         </label>
       </div>
       <div id="b50-version-list"></div>
+      <button id="b50-export" type="button">Export as Image</button>
     </section>
 
+    <div id="b50-capture">
     <section id="b50-summary">
       <div class="b50-stat">
         <span class="b50-label">New 15</span>
@@ -143,6 +146,7 @@
         </table>
       </div>
     </section>
+    </div>
   </div>
 
   <script src="app.js"></script>
