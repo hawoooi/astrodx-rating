@@ -119,6 +119,7 @@ let activeTab = "all";
 let b50NewCount = 2;
 let b50IgnoreNewer = false;
 let b50Combined = false;
+let b50Excluded = new Set(); // keys of scores excluded from B50
 
 // ── Rating functions ─────────────────────────────────────────────────────────
 
@@ -484,6 +485,10 @@ function applyFilters() {
 
 // ── Best 50 ─────────────────────────────────────────────────────────────────
 
+function scoreKey(s) {
+  return `${s.name.toLowerCase()}|${s.chartType}|${s.difficulty}`;
+}
+
 function computeBest50() {
   // Collect unique versions present in scores
   const versionSet = new Set();
@@ -512,8 +517,9 @@ function computeBest50() {
     maxRank = Math.max(...Array.from(newVersions).map(v => getVersionRank(v)));
   }
 
-  // Filter scores that have a known version
+  // Filter scores that have a known version and are not excluded
   const eligible = allScores.filter(s => {
+    if (b50Excluded.has(scoreKey(s))) return false;
     const rank = getVersionRank(s.version);
     if (rank < 0) return false;
     if (b50IgnoreNewer && rank > maxRank) return false;
@@ -564,12 +570,39 @@ function renderB50() {
     ];
   }
 
+  // Update excluded count / clear button
+  const excludeInfo = document.getElementById("b50-exclude-info");
+  if (b50Excluded.size > 0) {
+    excludeInfo.innerHTML = `${b50Excluded.size} score(s) excluded <button id="b50-clear-excluded" type="button">Clear</button>`;
+    document.getElementById("b50-clear-excluded").addEventListener("click", () => {
+      b50Excluded.clear();
+      renderB50();
+    });
+    excludeInfo.classList.remove("hidden");
+  } else {
+    excludeInfo.classList.add("hidden");
+  }
+
   const tbody = document.getElementById("b50-body");
   const fragment = document.createDocumentFragment();
 
   for (const s of rows) {
     const tr = document.createElement("tr");
     tr.className = DIFF_CLASS[s.difficulty] || "";
+
+    // Exclude button column
+    const tdExcl = document.createElement("td");
+    tdExcl.className = "b50-exclude-cell";
+    const btn = document.createElement("button");
+    btn.className = "b50-exclude-btn";
+    btn.textContent = "\u00d7";
+    btn.title = "Exclude from B50";
+    btn.addEventListener("click", () => {
+      b50Excluded.add(scoreKey(s));
+      renderB50();
+    });
+    tdExcl.appendChild(btn);
+    tr.appendChild(tdExcl);
 
     // # column
     const tdIdx = document.createElement("td");

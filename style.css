@@ -259,6 +259,52 @@ header h1 {
   color: #666;
 }
 
+/* B50 exclude */
+.b50-exclude-btn {
+  background: none;
+  border: 1px solid #555;
+  border-radius: 3px;
+  color: #888;
+  cursor: pointer;
+  font-size: 0.75rem;
+  line-height: 1;
+  padding: 0.1rem 0.35rem;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.b50-exclude-btn:hover {
+  color: #ee4444;
+  border-color: #ee4444;
+}
+
+.b50-exclude-col { width: 1.5rem; }
+
+#b50-exclude-info {
+  font-size: 0.8rem;
+  color: #aaa;
+}
+
+#b50-exclude-info button {
+  background: none;
+  border: 1px solid #555;
+  border-radius: 4px;
+  color: #aaa;
+  cursor: pointer;
+  font-size: 0.75rem;
+  padding: 0.15rem 0.5rem;
+  margin-left: 0.4rem;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+#b50-exclude-info button:hover {
+  color: #fff;
+  border-color: #7c5cbf;
+}
+
+/* Hide exclude column in exported image */
+.exporting .b50-exclude-col,
+.exporting td.b50-exclude-cell { display: none; }
+
 /* Export button */
 #b50-export {
   background: #7c5cbf;
