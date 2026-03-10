@@ -113,6 +113,12 @@ let allScores = [];
 let filteredScores = [];
 let sortCol = "rating";
 let sortAsc = false;
+let activeTab = "all";
+
+// B50 state
+let b50NewCount = 2;
+let b50IgnoreNewer = false;
+let b50Combined = false;
 
 // ── Rating functions ─────────────────────────────────────────────────────────
 
@@ -226,9 +232,29 @@ const DX_VERSIONS = new Set([
   "CiRCLE",
 ]);
 
+// Ordered list of all maimai versions (oldest → newest) for B50 sorting
+const VERSION_ORDER = [
+  "maimai", "maimai PLUS", "GreeN", "GreeN PLUS",
+  "ORANGE", "ORANGE PLUS", "PiNK", "PiNK PLUS",
+  "MURASAKi", "MURASAKi PLUS", "MiLK", "MiLK PLUS", "FiNALE",
+  "maimaiでらっくす", "maimaiでらっくす PLUS",
+  "Splash", "Splash PLUS",
+  "UNiVERSE", "UNiVERSE PLUS",
+  "FESTiVAL", "FESTiVAL PLUS",
+  "BUDDiES", "BUDDiES PLUS",
+  "PRiSM", "PRiSM PLUS",
+  "CiRCLE",
+];
+const VERSION_RANK = {};
+VERSION_ORDER.forEach((v, i) => { VERSION_RANK[v] = i; });
+
 function chartTypeFromVersion(versionStr) {
   if (!versionStr) return "";
   return DX_VERSIONS.has(versionStr) ? "DX" : "ST";
+}
+
+function getVersionRank(versionStr) {
+  return VERSION_RANK[versionStr] ?? -1;
 }
 
 // ── Data fetching ────────────────────────────────────────────────────────────
@@ -404,7 +430,7 @@ function renderTable() {
     const cells = [
       i + 1,
       s.chartType,
-      s.version,
+      versionName(s.version),
       s.genre,
       s.playcount,
       s.name,
@@ -456,6 +482,157 @@ function applyFilters() {
   renderTable();
 }
 
+// ── Best 50 ─────────────────────────────────────────────────────────────────
+
+function computeBest50() {
+  // Collect unique versions present in scores
+  const versionSet = new Set();
+  for (const s of allScores) {
+    if (s.version && getVersionRank(s.version) >= 0) {
+      versionSet.add(s.version);
+    }
+  }
+
+  // Sort versions by rank (newest first)
+  const sortedVersions = Array.from(versionSet).sort((a, b) => getVersionRank(b) - getVersionRank(a));
+
+  // Update version list display
+  const listEl = document.getElementById("b50-version-list");
+  if (listEl) {
+    const newVers = sortedVersions.slice(0, b50NewCount);
+    const oldVers = sortedVersions.slice(b50NewCount);
+    listEl.textContent = `New: ${newVers.map(versionName).join(", ") || "—"}  |  Old: ${oldVers.length} versions`;
+  }
+
+  const newVersions = new Set(sortedVersions.slice(0, b50NewCount));
+
+  // Determine max allowed version rank (for ignore-newer feature)
+  let maxRank = Infinity;
+  if (b50IgnoreNewer && newVersions.size > 0) {
+    maxRank = Math.max(...Array.from(newVersions).map(v => getVersionRank(v)));
+  }
+
+  // Filter scores that have a known version
+  const eligible = allScores.filter(s => {
+    const rank = getVersionRank(s.version);
+    if (rank < 0) return false;
+    if (b50IgnoreNewer && rank > maxRank) return false;
+    return true;
+  });
+
+  // Split into new/old and sort by rating desc
+  const newScores = eligible
+    .filter(s => newVersions.has(s.version))
+    .sort((a, b) => b.rating - a.rating)
+    .slice(0, 15);
+
+  const oldScores = eligible
+    .filter(s => !newVersions.has(s.version))
+    .sort((a, b) => b.rating - a.rating)
+    .slice(0, 35);
+
+  return { newScores, oldScores };
+}
+
+function renderB50() {
+  const { newScores, oldScores } = computeBest50();
+
+  const newSum = newScores.reduce((s, x) => s + x.rating, 0);
+  const oldSum = oldScores.reduce((s, x) => s + x.rating, 0);
+  const total = newSum + oldSum;
+
+  document.getElementById("b50-new-sum").textContent = newSum;
+  document.getElementById("b50-old-sum").textContent = oldSum;
+  document.getElementById("b50-total").innerHTML = `<strong>${total}</strong>`;
+  document.getElementById("b50-new-avg").textContent = newScores.length ? (newSum / newScores.length).toFixed(1) : "0";
+  document.getElementById("b50-old-avg").textContent = oldScores.length ? (oldSum / oldScores.length).toFixed(1) : "0";
+  const totalCount = newScores.length + oldScores.length;
+  document.getElementById("b50-total-avg").textContent = totalCount ? (total / totalCount).toFixed(1) : "0";
+
+  // Build row list — separate (NEW block then OLD block) or combined (single sorted list)
+  let rows;
+  if (b50Combined) {
+    const all = [
+      ...newScores.map(s => ({ ...s, pool: "NEW" })),
+      ...oldScores.map(s => ({ ...s, pool: "OLD" })),
+    ].sort((a, b) => b.rating - a.rating);
+    rows = all.map((s, i) => ({ ...s, idx: i + 1 }));
+  } else {
+    rows = [
+      ...newScores.map((s, i) => ({ ...s, pool: "NEW", idx: i + 1 })),
+      ...oldScores.map((s, i) => ({ ...s, pool: "OLD", idx: i + 1 })),
+    ];
+  }
+
+  const tbody = document.getElementById("b50-body");
+  const fragment = document.createDocumentFragment();
+
+  for (const s of rows) {
+    const tr = document.createElement("tr");
+    tr.className = DIFF_CLASS[s.difficulty] || "";
+
+    // # column
+    const tdIdx = document.createElement("td");
+    tdIdx.textContent = s.idx;
+    tr.appendChild(tdIdx);
+
+    // Pool column
+    const tdPool = document.createElement("td");
+    tdPool.textContent = s.pool;
+    tdPool.className = s.pool === "NEW" ? "pool-new" : "pool-old";
+    tr.appendChild(tdPool);
+
+    // Rest of columns (same as all-scores)
+    const cells = [
+      s.chartType,
+      versionName(s.version),
+      s.genre,
+      s.playcount,
+      s.name,
+      s.levelFromServer ? s.level.toFixed(1) : s.level.toFixed(0),
+      s.clear,
+      s.accuracy.toFixed(4) + "%",
+      s.rank,
+      s.rating,
+    ];
+
+    for (const val of cells) {
+      const td = document.createElement("td");
+      td.textContent = val;
+      tr.appendChild(td);
+    }
+
+    // Rating-if columns
+    for (const { key } of RATING_IF_RANKS) {
+      const td = document.createElement("td");
+      const gain = s[key];
+      if (gain != null && gain > 0) {
+        td.textContent = "+" + gain;
+        td.className = "gain";
+      }
+      tr.appendChild(td);
+    }
+
+    fragment.appendChild(tr);
+  }
+
+  tbody.innerHTML = "";
+  tbody.appendChild(fragment);
+}
+
+function switchTab(tab) {
+  activeTab = tab;
+  document.querySelectorAll(".tab").forEach(t => {
+    t.classList.toggle("active", t.dataset.tab === tab);
+  });
+  document.getElementById("tab-all").classList.toggle("hidden", tab !== "all");
+  document.getElementById("tab-b50").classList.toggle("hidden", tab !== "b50");
+
+  if (tab === "b50" && allScores.length > 0) {
+    renderB50();
+  }
+}
+
 // ── Event setup ──────────────────────────────────────────────────────────────
 
 function setupEvents() {
@@ -487,6 +664,27 @@ function setupEvents() {
   // Difficulty filters
   document.querySelectorAll("#diff-filters input").forEach(cb => {
     cb.addEventListener("change", applyFilters);
+  });
+
+  // Tabs
+  document.querySelectorAll(".tab").forEach(t => {
+    t.addEventListener("click", () => switchTab(t.dataset.tab));
+  });
+
+  // B50 settings
+  document.getElementById("b50-new-count").addEventListener("change", (e) => {
+    b50NewCount = parseInt(e.target.value, 10);
+    if (allScores.length > 0) renderB50();
+  });
+
+  document.getElementById("b50-ignore-newer").addEventListener("change", (e) => {
+    b50IgnoreNewer = e.target.checked;
+    if (allScores.length > 0) renderB50();
+  });
+
+  document.getElementById("b50-display-mode").addEventListener("change", (e) => {
+    b50Combined = e.target.value === "combined";
+    if (allScores.length > 0) renderB50();
   });
 
   // Column sort
@@ -525,8 +723,10 @@ function handleFile(file) {
       filteredScores = [...allScores];
 
       document.getElementById("upload-section").classList.add("hidden");
+      document.getElementById("tab-bar").classList.remove("hidden");
       document.getElementById("controls").classList.remove("hidden");
       document.getElementById("table-section").classList.remove("hidden");
+      document.getElementById("b50-ignore-label").classList.remove("hidden");
 
       // Default sort: rating descending
       sortCol = "rating";

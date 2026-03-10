@@ -20,46 +20,130 @@
     </label>
   </section>
 
-  <section id="controls" class="hidden">
-    <input type="text" id="search" placeholder="Search by title...">
-    <div id="diff-filters">
-      <label><input type="checkbox" value="Basic" checked> <span class="diff-basic">Basic</span></label>
-      <label><input type="checkbox" value="Advanced" checked> <span class="diff-advanced">Advanced</span></label>
-      <label><input type="checkbox" value="Expert" checked> <span class="diff-expert">Expert</span></label>
-      <label><input type="checkbox" value="Master" checked> <span class="diff-master">Master</span></label>
-      <label><input type="checkbox" value="Re:Master" checked> <span class="diff-remaster">Re:Master</span></label>
-    </div>
-  </section>
+  <!-- Tab bar -->
+  <nav id="tab-bar" class="hidden">
+    <button class="tab active" data-tab="all">All Scores</button>
+    <button class="tab" data-tab="b50">Best 50</button>
+  </nav>
 
-  <section id="table-section" class="hidden">
-    <div id="table-wrapper">
-      <table id="score-table">
-        <thead>
-          <tr>
-            <th data-col="#">#</th>
-            <th data-col="chartType">Type</th>
-            <th data-col="version">Ver</th>
-            <th data-col="genre">Genre</th>
-            <th data-col="playcount">Plays</th>
-            <th data-col="name">Name</th>
-            <th data-col="level">Lv</th>
-            <th data-col="clear">Clear</th>
-            <th data-col="accuracy">Acc%</th>
-            <th data-col="rank">Rank</th>
-            <th data-col="rating" class="sorted desc">Rating</th>
-            <th data-col="rating_s">if S</th>
-            <th data-col="rating_sp">if S+</th>
-            <th data-col="rating_ss">if SS</th>
-            <th data-col="rating_ssp">if SS+</th>
-            <th data-col="rating_sss">if SSS</th>
-            <th data-col="rating_sssp">if SSS+</th>
-          </tr>
-        </thead>
-        <tbody id="score-body"></tbody>
-      </table>
-    </div>
-    <p id="table-info"></p>
-  </section>
+  <!-- All Scores tab -->
+  <div id="tab-all">
+    <section id="controls" class="hidden">
+      <input type="text" id="search" placeholder="Search by title...">
+      <div id="diff-filters">
+        <label><input type="checkbox" value="Basic" checked> <span class="diff-basic">Basic</span></label>
+        <label><input type="checkbox" value="Advanced" checked> <span class="diff-advanced">Advanced</span></label>
+        <label><input type="checkbox" value="Expert" checked> <span class="diff-expert">Expert</span></label>
+        <label><input type="checkbox" value="Master" checked> <span class="diff-master">Master</span></label>
+        <label><input type="checkbox" value="Re:Master" checked> <span class="diff-remaster">Re:Master</span></label>
+      </div>
+    </section>
+
+    <section id="table-section" class="hidden">
+      <div id="table-wrapper">
+        <table id="score-table" class="score-table">
+          <thead>
+            <tr>
+              <th data-col="#">#</th>
+              <th data-col="chartType">Type</th>
+              <th data-col="version">Ver</th>
+              <th data-col="genre">Genre</th>
+              <th data-col="playcount">Plays</th>
+              <th data-col="name">Name</th>
+              <th data-col="level">Lv</th>
+              <th data-col="clear">Clear</th>
+              <th data-col="accuracy">Acc%</th>
+              <th data-col="rank">Rank</th>
+              <th data-col="rating" class="sorted desc">Rating</th>
+              <th data-col="rating_s">if S</th>
+              <th data-col="rating_sp">if S+</th>
+              <th data-col="rating_ss">if SS</th>
+              <th data-col="rating_ssp">if SS+</th>
+              <th data-col="rating_sss">if SSS</th>
+              <th data-col="rating_sssp">if SSS+</th>
+            </tr>
+          </thead>
+          <tbody id="score-body"></tbody>
+        </table>
+      </div>
+      <p id="table-info"></p>
+    </section>
+  </div>
+
+  <!-- Best 50 tab -->
+  <div id="tab-b50" class="hidden">
+    <section id="b50-settings">
+      <div id="b50-version-config">
+        <label>New versions:
+          <select id="b50-new-count">
+            <option value="1">1</option>
+            <option value="2" selected>2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+          </select>
+          most recent
+        </label>
+        <label id="b50-ignore-label" class="hidden">
+          <input type="checkbox" id="b50-ignore-newer"> Ignore charts newer than selected versions
+        </label>
+        <label>Display:
+          <select id="b50-display-mode">
+            <option value="separate" selected>Separate (NEW / OLD)</option>
+            <option value="combined">Combined</option>
+          </select>
+        </label>
+      </div>
+      <div id="b50-version-list"></div>
+    </section>
+
+    <section id="b50-summary">
+      <div class="b50-stat">
+        <span class="b50-label">New 15</span>
+        <span id="b50-new-sum">0</span>
+        <span class="b50-avg">avg <span id="b50-new-avg">0</span></span>
+      </div>
+      <div class="b50-stat">
+        <span class="b50-label">Old 35</span>
+        <span id="b50-old-sum">0</span>
+        <span class="b50-avg">avg <span id="b50-old-avg">0</span></span>
+      </div>
+      <div class="b50-stat b50-total">
+        <span class="b50-label">Total</span>
+        <span id="b50-total"><strong>0</strong></span>
+        <span class="b50-avg">avg <span id="b50-total-avg">0</span></span>
+      </div>
+    </section>
+
+    <section id="b50-table-section">
+      <div id="b50-table-wrapper">
+        <table id="b50-table" class="score-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Pool</th>
+              <th>Type</th>
+              <th>Ver</th>
+              <th>Genre</th>
+              <th>Plays</th>
+              <th>Name</th>
+              <th>Lv</th>
+              <th>Clear</th>
+              <th>Acc%</th>
+              <th>Rank</th>
+              <th>Rating</th>
+              <th>if S</th>
+              <th>if S+</th>
+              <th>if SS</th>
+              <th>if SS+</th>
+              <th>if SSS</th>
+              <th>if SSS+</th>
+            </tr>
+          </thead>
+          <tbody id="b50-body"></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
 
   <script src="app.js"></script>
 </body>

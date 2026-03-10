@@ -56,6 +56,34 @@ header h1 {
   border-radius: 3px;
 }
 
+/* Tabs */
+#tab-bar {
+  display: flex;
+  gap: 0;
+  max-width: 900px;
+  margin: 0 auto 1rem;
+  border-bottom: 2px solid #333;
+}
+
+.tab {
+  background: none;
+  border: none;
+  color: #888;
+  font-size: 0.9rem;
+  padding: 0.6rem 1.5rem;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  transition: color 0.2s, border-color 0.2s;
+}
+
+.tab:hover { color: #ccc; }
+
+.tab.active {
+  color: #fff;
+  border-bottom-color: #7c5cbf;
+}
+
 /* Controls */
 #controls {
   max-width: 900px;
@@ -96,24 +124,15 @@ header h1 {
   cursor: pointer;
 }
 
-/* Table */
-#table-section {
-  max-width: 100%;
-  overflow-x: auto;
-}
-
-#table-wrapper {
-  overflow-x: auto;
-}
-
-#score-table {
+/* Shared table styles */
+.score-table {
   width: 100%;
   border-collapse: collapse;
   font-size: 0.8rem;
   white-space: nowrap;
 }
 
-#score-table th {
+.score-table th {
   position: sticky;
   top: 0;
   background: #16213e;
@@ -129,29 +148,29 @@ header h1 {
   border-bottom: 2px solid #333;
 }
 
-#score-table th:hover {
-  color: #fff;
-}
+.score-table th:hover { color: #fff; }
 
-#score-table th.sorted::after {
-  margin-left: 0.3em;
-}
+.score-table th.sorted::after { margin-left: 0.3em; }
+.score-table th.sorted.asc::after { content: ' \25B2'; }
+.score-table th.sorted.desc::after { content: ' \25BC'; }
 
-#score-table th.sorted.asc::after {
-  content: ' \25B2';
-}
-
-#score-table th.sorted.desc::after {
-  content: ' \25BC';
-}
-
-#score-table td {
+.score-table td {
   padding: 0.35rem 0.6rem;
   border-bottom: 1px solid #222;
 }
 
-#score-table tbody tr:hover {
+.score-table tbody tr:hover {
   background: rgba(124, 92, 191, 0.1);
+}
+
+/* Table sections */
+#table-section, #b50-table-section {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+#table-wrapper, #b50-table-wrapper {
+  overflow-x: auto;
 }
 
 /* Difficulty colors */
@@ -167,14 +186,81 @@ header h1 {
 /* Rating-if gain columns */
 .gain { color: #66dd88; font-weight: 600; }
 
-/* Rank colors */
-.rank-sss { color: #ffd700; }
-.rank-ss { color: #ffcc44; }
-.rank-s { color: #f0a030; }
+/* Pool badges */
+.pool-new { color: #44bbee; font-weight: 600; }
+.pool-old { color: #aaa; }
+
+/* B50 settings */
+#b50-settings {
+  max-width: 900px;
+  margin: 0 auto 1rem;
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  flex-wrap: wrap;
+  font-size: 0.85rem;
+}
+
+#b50-version-config {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+#b50-version-config select {
+  background: #16213e;
+  border: 1px solid #333;
+  border-radius: 4px;
+  color: #e0e0e0;
+  padding: 0.25rem 0.4rem;
+  font-size: 0.85rem;
+}
+
+#b50-version-list {
+  font-size: 0.8rem;
+  color: #888;
+}
+
+/* B50 summary */
+#b50-summary {
+  max-width: 900px;
+  margin: 0 auto 1rem;
+  display: flex;
+  gap: 2rem;
+  flex-wrap: wrap;
+}
+
+.b50-stat {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.b50-label {
+  color: #888;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.b50-stat span:nth-child(2) {
+  font-size: 1.2rem;
+  color: #e0e0e0;
+}
+
+.b50-total span:nth-child(2) {
+  font-size: 1.4rem;
+  color: #fff;
+}
+
+.b50-avg {
+  font-size: 0.75rem;
+  color: #666;
+}
 
 /* Misc */
 .hidden { display: none !important; }
-
 .text-right { text-align: right; }
 
 #table-info {
