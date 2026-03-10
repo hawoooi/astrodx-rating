@@ -1,0 +1,10 @@
+{
+  "_comment": "Manual chart data for songs missing from dxdata.json. Only used as fallback when server data is not found. Key format: title (lowercase)|type|difficulty → { internalLevelValue, version, category }",
+  "overrides": {
+    "break the speakers|dx|basic": { "internalLevelValue": null, "version": "CiRCLE", "category": null },
+    "break the speakers|dx|advanced": { "internalLevelValue": null, "version": "CiRCLE", "category": null },
+    "break the speakers|dx|expert": { "internalLevelValue": null, "version": "CiRCLE", "category": null },
+    "break the speakers|dx|master": { "internalLevelValue": 14.7, "version": "CiRCLE", "category": null },
+    "break the speakers|dx|remaster": { "internalLevelValue": null, "version": "CiRCLE", "category": null }
+  }
+}

@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AstroDX Rating Viewer</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
+</head>
+<body>
+  <header>
+    <h1>AstroDX Rating Viewer</h1>
+    <p id="status">Loading chart data...</p>
+  </header>
+
+  <section id="upload-section">
+    <label id="upload-area">
+      <input type="file" id="file-input" accept="*">
+      <span>Drop or click to upload your <code>cache</code> file</span>
+    </label>
+  </section>
+
+  <section id="controls" class="hidden">
+    <input type="text" id="search" placeholder="Search by title...">
+    <div id="diff-filters">
+      <label><input type="checkbox" value="Basic" checked> <span class="diff-basic">Basic</span></label>
+      <label><input type="checkbox" value="Advanced" checked> <span class="diff-advanced">Advanced</span></label>
+      <label><input type="checkbox" value="Expert" checked> <span class="diff-expert">Expert</span></label>
+      <label><input type="checkbox" value="Master" checked> <span class="diff-master">Master</span></label>
+      <label><input type="checkbox" value="Re:Master" checked> <span class="diff-remaster">Re:Master</span></label>
+    </div>
+  </section>
+
+  <section id="table-section" class="hidden">
+    <div id="table-wrapper">
+      <table id="score-table">
+        <thead>
+          <tr>
+            <th data-col="#">#</th>
+            <th data-col="chartType">Type</th>
+            <th data-col="version">Ver</th>
+            <th data-col="genre">Genre</th>
+            <th data-col="playcount">Plays</th>
+            <th data-col="name">Name</th>
+            <th data-col="level">Lv</th>
+            <th data-col="clear">Clear</th>
+            <th data-col="accuracy">Acc%</th>
+            <th data-col="rank">Rank</th>
+            <th data-col="rating" class="sorted desc">Rating</th>
+            <th data-col="rating_s">if S</th>
+            <th data-col="rating_sp">if S+</th>
+            <th data-col="rating_ss">if SS</th>
+            <th data-col="rating_ssp">if SS+</th>
+            <th data-col="rating_sss">if SSS</th>
+            <th data-col="rating_sssp">if SSS+</th>
+          </tr>
+        </thead>
+        <tbody id="score-body"></tbody>
+      </table>
+    </div>
+    <p id="table-info"></p>
+  </section>
+
+  <script src="app.js"></script>
+</body>
+</html>

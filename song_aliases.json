@@ -1,0 +1,10 @@
+{
+  "_comment": "Maps incorrect/mismatched song names from AstroDX cache to correct names in dxdata.json. Key = cache title (lowercase), Value = correct title (lowercase).",
+  "aliases": {
+    "sunday night feat kanata.n": "sunday night feat. kanata.n",
+    "sunday night feat. kanata.n": "sunday night feat kanata.n",
+    "bad apple!! feat nomico": "bad apple!! feat.nomico",
+    "コンティニュー!feat. 藍月なくる": "コンティニュー! feat. 藍月なくる",
+    "フェイスフェイク・フェイルセイフ": "フェイクフェイス・フェイルセイフ"
+  }
+}
