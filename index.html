@@ -6,7 +6,6 @@
   <title>AstroDX Rating Viewer</title>
   <link rel="stylesheet" href="style.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
 <body>
   <header>
@@ -97,29 +96,35 @@
         </label>
       </div>
       <div id="b50-version-list"></div>
-      <label><input type="checkbox" id="b50-hide-if" checked> Hide "if" columns in export</label>
-      <button id="b50-export" type="button">Export as Image</button>
+      <button id="b50-export" type="button">Export Board as Image</button>
       <span id="b50-exclude-info" class="hidden"></span>
     </section>
 
     <div id="b50-capture">
-    <section id="b50-summary">
-      <div class="b50-stat">
-        <span class="b50-label">New 15</span>
-        <span id="b50-new-sum">0</span>
-        <span class="b50-avg">avg <span id="b50-new-avg">0</span></span>
+    <div id="b50-header">
+      <div class="b50-header-stats">
+        <div class="b50-header-block">
+          <span class="b50-header-label old">OLD 35</span>
+          <span class="b50-header-value" id="b50-old-sum">0</span>
+          <span class="b50-header-avg">avg <span id="b50-old-avg">0</span></span>
+        </div>
+        <div class="b50-header-block">
+          <span class="b50-header-label new">NEW 15</span>
+          <span class="b50-header-value" id="b50-new-sum">0</span>
+          <span class="b50-header-avg">avg <span id="b50-new-avg">0</span></span>
+        </div>
       </div>
-      <div class="b50-stat">
-        <span class="b50-label">Old 35</span>
-        <span id="b50-old-sum">0</span>
-        <span class="b50-avg">avg <span id="b50-old-avg">0</span></span>
+      <div class="b50-header-total">
+        <span class="b50-header-total-label">TOTAL</span>
+        <span class="b50-header-total-value" id="b50-total">0</span>
+        <span class="b50-header-avg">avg <span id="b50-total-avg">0</span></span>
       </div>
-      <div class="b50-stat b50-total">
-        <span class="b50-label">Total</span>
-        <span id="b50-total"><strong>0</strong></span>
-        <span class="b50-avg">avg <span id="b50-total-avg">0</span></span>
-      </div>
-    </section>
+    </div>
+
+    <section id="b50-top-plays"></section>
+
+    <div id="b50-footer">Generated with AstroDX Rating Viewer</div>
+    </div>
 
     <section id="b50-table-section">
       <div id="b50-table-wrapper">
@@ -152,7 +157,6 @@
         </table>
       </div>
     </section>
-    </div>
   </div>
 
   <!-- Statistics tab -->

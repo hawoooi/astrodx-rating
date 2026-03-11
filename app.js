@@ -637,7 +637,7 @@ function renderB50() {
 
   document.getElementById("b50-new-sum").textContent = newSum;
   document.getElementById("b50-old-sum").textContent = oldSum;
-  document.getElementById("b50-total").innerHTML = `<strong>${total}</strong>`;
+  document.getElementById("b50-total").textContent = total;
   document.getElementById("b50-new-avg").textContent = newScores.length ? (newSum / newScores.length).toFixed(1) : "0";
   document.getElementById("b50-old-avg").textContent = oldScores.length ? (oldSum / oldScores.length).toFixed(1) : "0";
   const totalCount = newScores.length + oldScores.length;
@@ -775,6 +775,71 @@ function renderB50() {
 
   tbody.innerHTML = "";
   tbody.appendChild(fragment);
+
+  renderB50TopPlays(newScores, oldScores);
+
+  // Pre-fetch jacket images in background for export
+  preloadExportImages([...newScores, ...oldScores]);
+}
+
+function renderB50TopPlays(newScores, oldScores) {
+  const container = document.getElementById("b50-top-plays");
+
+  function makeCard(s) {
+    const diffCls = DIFF_CLASS[s.difficulty] || "";
+    const isDX = s.chartType === "DX";
+    const lvText = s.levelFromServer ? s.level.toFixed(1) : s.level.toFixed(0);
+    const artSrc = s.imageName ? jacketUrl(s.imageName) : "";
+    const artHtml = artSrc
+      ? `<img class="tp-card-art" src="${artSrc}" onerror="this.style.visibility='hidden'">`
+      : `<div class="tp-card-art tp-card-art-empty"></div>`;
+    const clearStr = CLEAR_LABELS[s.clearType] || "";
+    const clearHtml = clearStr ? clearImg(clearStr, 16) : "";
+    const dxHtml = s.dxStars > 0 ? dxStarImg(s.dxStars, 18) : "";
+
+    return `<div class="tp-card ${diffCls}">
+      <div class="tp-card-top">
+        <div class="tp-card-top-info">
+          <span class="tp-card-name">${s.name}</span>
+          <span class="tp-card-constant">${lvText}</span>
+        </div>
+      </div>
+      <div class="tp-card-content">
+        ${artHtml}
+        <div class="tp-card-info">
+          <div class="tp-card-rank-row">
+            ${rankImg(s.rank, 20)}
+            <div class="tp-card-type ${isDX ? "dx" : "std"}">${isDX ? "DX" : "ST"}</div>
+          </div>
+          <div class="tp-card-info-bottom">
+            <div class="tp-card-accuracy">${s.accuracy.toFixed(4)}%</div>
+            <div class="tp-card-difficulty">${s.difficulty}</div>
+            <div class="tp-card-rating-row">
+              ${dxHtml}${clearHtml}
+              <span class="tp-card-rating">${s.rating}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  const oldCards = oldScores.map(makeCard).join("");
+  const newCards = newScores.map(makeCard).join("");
+
+  container.innerHTML = `
+    <div class="tp-grids-row">
+      <div class="tp-grid-section tp-old-section">
+        <div class="tp-section-label old">OLD CHARTS</div>
+        <div class="tp-card-grid tp-grid-7">${oldCards}</div>
+      </div>
+      <div class="tp-grid-divider"></div>
+      <div class="tp-grid-section tp-new-section">
+        <div class="tp-section-label new">NEW CHARTS</div>
+        <div class="tp-card-grid tp-grid-3">${newCards}</div>
+      </div>
+    </div>`;
+
 }
 
 // ── Statistics ────────────────────────────────────────────────────────────────
@@ -986,41 +1051,351 @@ function renderStats() {
   container.innerHTML = html;
 }
 
+// ── B50 Export (standalone page approach) ────────────────────────────────────
+
+const IMG_PROXY = "https://images.weserv.nl/?url=";
+
+// Convert local asset to data URL for embedding in export page
+const _assetDataUrls = new Map();
+function assetToDataUrl(path) {
+  if (_assetDataUrls.has(path)) return _assetDataUrls.get(path);
+  const p = new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => {
+      const c = document.createElement("canvas");
+      c.width = img.width; c.height = img.height;
+      c.getContext("2d").drawImage(img, 0, 0);
+      try { resolve(c.toDataURL("image/png")); }
+      catch { resolve(path); }
+    };
+    img.onerror = () => resolve(path);
+    img.src = path;
+  });
+  _assetDataUrls.set(path, p);
+  return p;
+}
+
+// Preload asset data URLs when B50 renders
+function preloadExportImages(scores) {
+  // Preload all rank/clear/dxstar assets as data URLs
+  for (const src of Object.values(RANK_IMAGES)) assetToDataUrl(src);
+  for (const src of Object.values(CLEAR_IMAGES)) assetToDataUrl(src);
+  for (const src of Object.values(DXSTAR_IMAGES)) assetToDataUrl(src);
+}
+
 async function exportB50Image() {
   const btn = document.getElementById("b50-export");
-  const capture = document.getElementById("b50-capture");
-
   btn.disabled = true;
-  btn.textContent = "Exporting...";
-
-  // Temporarily add exporting class for background/padding
-  capture.classList.add("exporting");
-  if (document.getElementById("b50-hide-if").checked) {
-    capture.classList.add("hide-if-cols");
-  }
+  btn.textContent = "Preparing export...";
 
   try {
-    const canvas = await html2canvas(capture, {
-      backgroundColor: "#1a1a2e",
-      scale: 2,
-      useCORS: true,
-    });
+    const { newScores, oldScores } = computeBest50();
+    const newSum = newScores.reduce((s, x) => s + x.rating, 0);
+    const oldSum = oldScores.reduce((s, x) => s + x.rating, 0);
+    const total = newSum + oldSum;
+    const totalCount = newScores.length + oldScores.length;
 
-    const link = document.createElement("a");
-    link.download = "best50.png";
-    link.href = canvas.toDataURL("image/png");
-    link.click();
-  } catch (err) {
-    console.error("Export failed:", err);
-    if (err.name === "SecurityError" && location.protocol === "file:") {
-      alert("Export doesn't work from file:// due to browser security.\nPlease use a local server (e.g. npx serve) or the hosted version.");
-    } else {
-      alert("Export failed. Check console for details.");
+    // Resolve all asset data URLs
+    const assetMap = {};
+    for (const [k, v] of Object.entries(RANK_IMAGES))
+      assetMap["rank_" + k] = await assetToDataUrl(v);
+    for (const [k, v] of Object.entries(CLEAR_IMAGES))
+      assetMap["clear_" + k] = await assetToDataUrl(v);
+    for (const [k, v] of Object.entries(DXSTAR_IMAGES))
+      assetMap["dx_" + k] = await assetToDataUrl(v);
+
+    function makeExportCard(s) {
+      const diffCls = ALIAS_TO_DIFF[s.difficulty] || "expert";
+      const isDX = s.chartType === "DX";
+      const lvText = s.levelFromServer ? s.level.toFixed(1) : s.level.toFixed(0);
+      const jacketSrc = s.imageName
+        ? IMG_PROXY + encodeURIComponent(jacketUrl(s.imageName))
+        : "";
+      const artHtml = jacketSrc
+        ? `<img class="tp-card-art" src="${jacketSrc}" crossorigin="anonymous" onerror="this.style.visibility='hidden'">`
+        : `<div class="tp-card-art tp-card-art-empty"></div>`;
+      const clearStr = CLEAR_LABELS[s.clearType] || "";
+      const clearHtml = clearStr && assetMap["clear_" + clearStr]
+        ? `<img class="icon-clear" src="${assetMap["clear_" + clearStr]}" height="24">`
+        : "";
+      const dxHtml = s.dxStars > 0 && assetMap["dx_" + s.dxStars]
+        ? `<img class="icon-dxstar" src="${assetMap["dx_" + s.dxStars]}" height="24">`
+        : "";
+      const rankHtml = assetMap["rank_" + s.rank]
+        ? `<img class="icon-rank" src="${assetMap["rank_" + s.rank]}" height="30">`
+        : s.rank;
+
+      return `<div class="tp-card diff-${diffCls}">
+        <div class="tp-card-top">
+          <div class="tp-card-top-info">
+            <span class="tp-card-name">${s.name.replace(/&/g,"&amp;").replace(/</g,"&lt;")}</span>
+            <span class="tp-card-constant">${lvText}</span>
+          </div>
+        </div>
+        <div class="tp-card-content">
+          ${artHtml}
+          <div class="tp-card-info">
+            <div class="tp-card-rank-row">
+              ${rankHtml}
+              <div class="tp-card-type ${isDX ? "dx" : "std"}">${isDX ? "DX" : "ST"}</div>
+            </div>
+            <div class="tp-card-info-bottom">
+              <div class="tp-card-accuracy">${s.accuracy.toFixed(4)}%</div>
+              <div class="tp-card-difficulty">${s.difficulty}</div>
+              <div class="tp-card-rating-row">
+                ${dxHtml}${clearHtml}
+                <span class="tp-card-rating">${s.rating}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>`;
     }
+
+    const oldCards = oldScores.map(makeExportCard).join("");
+    const newCards = newScores.map(makeExportCard).join("");
+
+    const exportHtml = `<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Best 50 Export</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"><\/script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #1a1a2e;
+  color: #fff;
+  font-family: 'Segoe UI', Tahoma, sans-serif;
+  padding: 16px;
+}
+.toolbar {
+  text-align: center;
+  margin-bottom: 12px;
+}
+.toolbar button {
+  background: #7c5cbf;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 20px;
+  font-size: 14px;
+  cursor: pointer;
+  font-weight: 600;
+}
+.toolbar button:hover { background: #9370db; }
+.toolbar button:disabled { background: #555; cursor: wait; }
+.toolbar .hint {
+  font-size: 12px;
+  color: #666;
+  margin-top: 4px;
+}
+#capture {
+  background: #2e1f48;
+  border-radius: 12px;
+  padding: 15px;
+  display: inline-block;
+}
+/* Header — 1.5x scaled */
+.b50-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 21px;
+  background: rgba(255,255,255,0.05);
+  border-radius: 12px;
+  margin-bottom: 12px;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+.b50-header-stats { display: flex; gap: 2.25rem; align-items: center; }
+.b50-header-block { display: flex; align-items: center; gap: 0.75rem; }
+.b50-header-label {
+  font-size: 16px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 1.5px; padding: 3px 15px; border-radius: 6px;
+}
+.b50-header-label.old { background: #c83858; }
+.b50-header-label.new { background: #2a9a8a; }
+.b50-header-value { font-size: 1.65rem; font-weight: 700; color: #e0e0e0; }
+.b50-header-avg { font-size: 1.125rem; color: #666; }
+.b50-header-total { display: flex; align-items: center; gap: 0.75rem; }
+.b50-header-total-label {
+  font-size: 16px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 1.5px; color: #888;
+}
+.b50-header-total-value {
+  background: linear-gradient(135deg, #c89520, #f0d060);
+  color: #2a2a2a; font-weight: 800; font-size: 22px;
+  padding: 3px 15px; border-radius: 6px;
+}
+/* Grid layout — all values 1.5x for export */
+.tp-grids-row { display: flex; gap: 12px; align-items: flex-start; background: rgba(0,0,0,0.25); border-radius: 12px; padding: 12px; }
+.tp-grid-section { min-width: 0; }
+.tp-old-section { flex: 7; }
+.tp-new-section { flex: 3; }
+.tp-grid-divider {
+  width: 3px; background: rgba(255,255,255,0.15);
+  align-self: stretch; flex-shrink: 0; border-radius: 2px;
+}
+.tp-section-label {
+  display: inline-block; font-size: 16px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 1.5px;
+  padding: 5px 21px; border-radius: 6px; margin-bottom: 9px;
+}
+.tp-section-label.old { background: #c83858; }
+.tp-section-label.new { background: #2a9a8a; }
+.tp-card-grid { display: grid; gap: 8px; }
+.tp-grid-7 { grid-template-columns: repeat(7, minmax(240px, 1fr)); }
+.tp-grid-3 { grid-template-columns: repeat(3, minmax(240px, 1fr)); }
+/* Card */
+.tp-card {
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 8px; overflow: hidden;
+}
+.tp-card.diff-expert    { background: rgba(200, 60, 60, 0.25); }
+.tp-card.diff-master    { background: rgba(140, 60, 180, 0.25); }
+.tp-card.diff-advanced  { background: rgba(220, 160, 40, 0.25); }
+.tp-card.diff-basic     { background: rgba(40, 160, 60, 0.25); }
+.tp-card.diff-remaster  {
+  background-color: rgb(74,48,104);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='34' height='34'%3E%3Crect width='34' height='34' fill='%234a3068'/%3E%3Cpath d='M0 34L34 0H17L0 17zM34 34V17L17 34z' fill='%234f3575' opacity='0.67'/%3E%3C/svg%3E");
+  background-size: 72px 72px;
+}
+.tp-card-top {
+  background: rgba(0,0,0,0.2);
+}
+.tp-card-type {
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 800; flex-shrink: 0;
+  padding: 3px 8px; border-radius: 3px; line-height: 1; margin-left: auto;
+}
+.tp-card-type.dx  { background: rgba(255,255,255,0.15); color: #ddd; }
+.tp-card-type.std { background: rgba(50,100,170,0.4); color: #aaccee; }
+.tp-card-top-info {
+  flex: 1; display: flex; align-items: center;
+  justify-content: space-between; padding: 6px 9px; gap: 6px; min-width: 0;
+}
+.tp-card-name {
+  font-size: 16px; font-weight: 700; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; line-height: 1.3;
+  flex: 1; min-width: 0;
+}
+.tp-card-constant {
+  flex-shrink: 0; font-size: 16px; font-weight: 800;
+  color: rgba(255,255,255,0.9); line-height: 1;
+}
+.tp-card-content {
+  display: flex; padding: 6px 9px 8px; gap: 9px; align-items: center;
+}
+.tp-card-art {
+  width: 40%; aspect-ratio: 1; object-fit: cover;
+  border-radius: 5px; flex-shrink: 0;
+}
+.tp-card-art-empty { background: #222; }
+.tp-card-info {
+  flex: 1; display: flex; flex-direction: column;
+  justify-content: space-between; min-width: 0;
+}
+.tp-card-rank-row {
+  display: flex; align-items: center; gap: 6px; justify-content: flex-start;
+}
+.tp-card-rank-row .icon-rank { height: 30px; }
+.tp-card-info-bottom { display: flex; flex-direction: column; gap: 2px; }
+.tp-card-accuracy { font-size: 16px; font-weight: 600; color: rgba(255,255,255,0.6); }
+.tp-card-difficulty { font-size: 16px; font-weight: 600; color: rgba(255,255,255,0.4); }
+.tp-card-rating-row {
+  display: flex; align-items: center; justify-content: flex-end; gap: 6px;
+}
+.tp-card-rating-row .icon-clear { height: 24px; }
+.tp-card-rating-row .icon-dxstar { height: 24px; }
+.tp-card-rating {
+  font-size: 26px; font-weight: 800; color: #ffd860;
+  line-height: 1; text-shadow: 0 0 12px rgba(255,200,50,0.2);
+}
+.footer {
+  text-align: center; padding: 9px; font-size: 15px;
+  color: rgba(255,255,255,0.2);
+}
+</style>
+</head><body>
+<div class="toolbar">
+  <button id="dl-btn" onclick="downloadImage()">Download as PNG</button>
+  <div class="hint">Or right-click the board below and "Save image as..."</div>
+</div>
+<div id="capture">
+  <div class="b50-header">
+    <div class="b50-header-stats">
+      <div class="b50-header-block">
+        <span class="b50-header-label old">OLD ${oldScores.length}</span>
+        <span class="b50-header-value">${oldSum}</span>
+        <span class="b50-header-avg">avg ${oldScores.length ? (oldSum / oldScores.length).toFixed(1) : "0"}</span>
+      </div>
+      <div class="b50-header-block">
+        <span class="b50-header-label new">NEW ${newScores.length}</span>
+        <span class="b50-header-value">${newSum}</span>
+        <span class="b50-header-avg">avg ${newScores.length ? (newSum / newScores.length).toFixed(1) : "0"}</span>
+      </div>
+    </div>
+    <div class="b50-header-total">
+      <span class="b50-header-total-label">TOTAL</span>
+      <span class="b50-header-total-value">${total}</span>
+      <span class="b50-header-avg">avg ${totalCount ? (total / totalCount).toFixed(1) : "0"}</span>
+    </div>
+  </div>
+  <div class="tp-grids-row">
+    <div class="tp-grid-section tp-old-section">
+      <div class="tp-section-label old">OLD CHARTS</div>
+      <div class="tp-card-grid tp-grid-7">${oldCards}</div>
+    </div>
+    <div class="tp-grid-divider"></div>
+    <div class="tp-grid-section tp-new-section">
+      <div class="tp-section-label new">NEW CHARTS</div>
+      <div class="tp-card-grid tp-grid-3">${newCards}</div>
+    </div>
+  </div>
+  <div class="footer">Generated with AstroDX Rating Viewer</div>
+</div>
+<script>
+async function downloadImage() {
+  const btn = document.getElementById("dl-btn");
+  btn.disabled = true;
+  btn.textContent = "Rendering...";
+  try {
+    const el = document.getElementById("capture");
+    const canvas = await html2canvas(el, {
+      backgroundColor: "#2e1f48",
+      scale: 1,
+      useCORS: true,
+      allowTaint: false,
+      logging: false,
+    });
+    const a = document.createElement("a");
+    a.download = "best50.png";
+    a.href = canvas.toDataURL("image/png");
+    a.click();
+  } catch (e) {
+    console.error(e);
+    alert("Download failed. Try right-clicking the board and saving as image, or use a screenshot tool.");
   } finally {
-    capture.classList.remove("exporting", "hide-if-cols");
     btn.disabled = false;
-    btn.textContent = "Export as Image";
+    btn.textContent = "Download as PNG";
+  }
+}
+<\/script>
+</body></html>`;
+
+    // Open in new window
+    const popup = window.open("", "_blank");
+    if (!popup) {
+      alert("Popup blocked! Please allow popups for this site.");
+      return;
+    }
+    popup.document.open();
+    popup.document.write(exportHtml);
+    popup.document.close();
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Export Board as Image";
   }
 }
 
