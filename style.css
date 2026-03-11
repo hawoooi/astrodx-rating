@@ -179,8 +179,16 @@ header h1 {
 .diff-expert, tr.diff-expert td { color: #ee4444; }
 .diff-master, tr.diff-master td { color: #bb66ee; }
 .diff-remaster, tr.diff-remaster td {
-  color: #fff;
+  color: #ddb0ff;
   text-shadow: 0 0 6px #bb66ee, 0 0 12px #9944cc;
+}
+
+/* Bold columns (Lv, Rating) */
+.col-bold { font-weight: 700; }
+
+/* Rank/clear icons */
+.icon-rank, .icon-clear, .icon-dxstar {
+  vertical-align: middle;
 }
 
 /* Rating-if gain columns */
@@ -304,6 +312,9 @@ header h1 {
 /* Hide exclude column in exported image */
 .exporting .b50-exclude-col,
 .exporting td.b50-exclude-cell { display: none; }
+
+/* Hide "if" columns in export when option is checked */
+.exporting.hide-if-cols .col-if { display: none; }
 
 /* Export button */
 #b50-export {

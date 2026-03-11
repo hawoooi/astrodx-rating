@@ -44,6 +44,48 @@ const RANK_LABELS = [
 const CLEAR_LABELS = { 0: "", 1: "", 2: "", 3: "FC", 4: "FC+", 5: "AP", 6: "AP+" };
 const AP_CLEAR_TYPES = new Set([5, 6]);
 
+const RANK_IMAGES = {
+  "D": "assets/d.png", "C": "assets/c.png", "B": "assets/b.png",
+  "BB": "assets/bb.png", "BBB": "assets/bbb.png", "A": "assets/a.png",
+  "AA": "assets/aa.png", "AAA": "assets/aaa.png", "S": "assets/s.png",
+  "S+": "assets/splus.png", "SS": "assets/ss.png", "SS+": "assets/ssplus.png",
+  "SSS": "assets/sss.png", "SSS+": "assets/sssplus.png",
+};
+
+const CLEAR_IMAGES = {
+  "FC": "assets/fc.png", "FC+": "assets/fcplus.png",
+  "AP": "assets/ap.png", "AP+": "assets/applus.png",
+};
+
+function rankImg(rank, height) {
+  const src = RANK_IMAGES[rank];
+  if (!src) return rank;
+  const h = height || 16;
+  return `<img class="icon-rank" src="${src}" height="${h}" alt="${rank}" title="${rank}">`;
+}
+
+function clearImg(clear, height) {
+  const src = CLEAR_IMAGES[clear];
+  if (!src) return clear;
+  const h = height || 16;
+  return `<img class="icon-clear" src="${src}" height="${h}" alt="${clear}" title="${clear}">`;
+}
+
+const DXSTAR_IMAGES = {
+  1: "assets/music_icon_dxstar_1.png",
+  2: "assets/music_icon_dxstar_2.png",
+  3: "assets/music_icon_dxstar_3.png",
+  4: "assets/music_icon_dxstar_4.png",
+  5: "assets/music_icon_dxstar_5.png",
+};
+
+function dxStarImg(stars, height) {
+  const src = DXSTAR_IMAGES[stars];
+  if (!src) return "";
+  const h = height || 16;
+  return `<img class="icon-dxstar" src="${src}" height="${h}" alt="${stars} stars" title="${stars} DX stars">`;
+}
+
 const RATING_IF_RANKS = [
   { key: "rating_s", rank: "S", minAchv: 97.0 },
   { key: "rating_sp", rank: "S+", minAchv: 98.0 },
@@ -395,6 +437,7 @@ function processScores(cache) {
         internalLv,
         dxScore: stats.dxScore || 0,
         totalNotes: stats.totalNotesCount || 0,
+        dxStars: getDxStars(stats.dxScore || 0, stats.totalNotesCount || 0),
         ...ratingIf,
       });
     }
@@ -445,11 +488,6 @@ function renderTable() {
       s.genre,
       s.playcount,
       s.name,
-      s.levelFromServer ? s.level.toFixed(1) : s.level.toFixed(0),
-      s.clear,
-      s.accuracy.toFixed(4) + "%",
-      s.rank,
-      s.rating,
     ];
 
     for (const val of cells) {
@@ -457,6 +495,38 @@ function renderTable() {
       td.textContent = val;
       tr.appendChild(td);
     }
+
+    // Lv (bold)
+    const tdLv = document.createElement("td");
+    tdLv.textContent = s.levelFromServer ? s.level.toFixed(1) : s.level.toFixed(0);
+    tdLv.className = "col-bold";
+    tr.appendChild(tdLv);
+
+    // Clear (image)
+    const tdClear = document.createElement("td");
+    if (s.clear) tdClear.innerHTML = clearImg(s.clear, 16);
+    tr.appendChild(tdClear);
+
+    // Accuracy
+    const tdAcc = document.createElement("td");
+    tdAcc.textContent = s.accuracy.toFixed(4) + "%";
+    tr.appendChild(tdAcc);
+
+    // Rank (image)
+    const tdRank = document.createElement("td");
+    tdRank.innerHTML = rankImg(s.rank, 16);
+    tr.appendChild(tdRank);
+
+    // Rating (bold)
+    const tdRating = document.createElement("td");
+    tdRating.textContent = s.rating;
+    tdRating.className = "col-bold";
+    tr.appendChild(tdRating);
+
+    // DX Stars
+    const tdDx = document.createElement("td");
+    if (s.dxStars > 0) tdDx.innerHTML = dxStarImg(s.dxStars, 16);
+    tr.appendChild(tdDx);
 
     // Rating-if columns
     for (const { key } of RATING_IF_RANKS) {
@@ -625,18 +695,13 @@ function renderB50() {
     tdPool.className = s.pool === "NEW" ? "pool-new" : "pool-old";
     tr.appendChild(tdPool);
 
-    // Rest of columns (same as all-scores)
+    // Rest of columns
     const cells = [
       s.chartType,
       versionName(s.version),
       s.genre,
       s.playcount,
       s.name,
-      s.levelFromServer ? s.level.toFixed(1) : s.level.toFixed(0),
-      s.clear,
-      s.accuracy.toFixed(4) + "%",
-      s.rank,
-      s.rating,
     ];
 
     for (const val of cells) {
@@ -645,13 +710,46 @@ function renderB50() {
       tr.appendChild(td);
     }
 
+    // Lv (bold)
+    const tdLv = document.createElement("td");
+    tdLv.textContent = s.levelFromServer ? s.level.toFixed(1) : s.level.toFixed(0);
+    tdLv.className = "col-bold";
+    tr.appendChild(tdLv);
+
+    // Clear (image)
+    const tdClear = document.createElement("td");
+    if (s.clear) tdClear.innerHTML = clearImg(s.clear, 16);
+    tr.appendChild(tdClear);
+
+    // Accuracy
+    const tdAcc = document.createElement("td");
+    tdAcc.textContent = s.accuracy.toFixed(4) + "%";
+    tr.appendChild(tdAcc);
+
+    // Rank (image)
+    const tdRank = document.createElement("td");
+    tdRank.innerHTML = rankImg(s.rank, 16);
+    tr.appendChild(tdRank);
+
+    // Rating (bold)
+    const tdRating = document.createElement("td");
+    tdRating.textContent = s.rating;
+    tdRating.className = "col-bold";
+    tr.appendChild(tdRating);
+
+    // DX Stars
+    const tdDx = document.createElement("td");
+    if (s.dxStars > 0) tdDx.innerHTML = dxStarImg(s.dxStars, 16);
+    tr.appendChild(tdDx);
+
     // Rating-if columns
     for (const { key } of RATING_IF_RANKS) {
       const td = document.createElement("td");
+      td.className = "col-if";
       const gain = s[key];
       if (gain != null && gain > 0) {
         td.textContent = "+" + gain;
-        td.className = "gain";
+        td.classList.add("gain");
       }
       tr.appendChild(td);
     }
@@ -810,7 +908,7 @@ function renderStats() {
       </div>
       <div class="top-chart-stats">
         <span class="top-chart-acc">${s.accuracy.toFixed(2)}%</span>
-        <span class="top-chart-rank-label">${s.rank}${clearStr ? " / " + clearStr : ""}</span>
+        <span class="top-chart-icons">${rankImg(s.rank, 14)}${clearStr ? " " + clearImg(clearStr, 14) : ""}${s.dxStars > 0 ? " " + dxStarImg(s.dxStars, 14) : ""}</span>
       </div>
       <span class="top-chart-plays">${s.playcount} plays</span>
     </div>`;
@@ -845,7 +943,7 @@ function renderStats() {
   html += `<div class="stat-card">
     <h3>DX Score Stars</h3>`;
   for (let i = 0; i <= 5; i++) {
-    const label = i === 0 ? "No stars" : "\u2605".repeat(i);
+    const label = i === 0 ? "No stars" : dxStarImg(i, 18);
     html += buildBar(label, starCounts[i], starMax, i === 0 ? "#555" : `hsl(${40 + i * 10}, 90%, ${50 + i * 5}%)`);
   }
   html += `</div>`;
@@ -855,7 +953,7 @@ function renderStats() {
     <h3>Rank Distribution</h3>`;
   for (const r of rankOrder) {
     const c = rankCounts.get(r) || 0;
-    html += buildBar(r, c, rankMax, "#7c5cbf");
+    html += buildBar(rankImg(r, 14), c, rankMax, "#7c5cbf");
   }
   html += `</div>`;
 
@@ -863,7 +961,8 @@ function renderStats() {
   html += `<div class="stat-card">
     <h3>Clear Type</h3>`;
   for (const c of clearOrder) {
-    html += buildBar(c.label, clearCounts[c.key], clearMax, clearColors[c.key]);
+    const label = CLEAR_IMAGES[c.label] ? clearImg(c.label, 14) : c.label;
+    html += buildBar(label, clearCounts[c.key], clearMax, clearColors[c.key]);
   }
   html += `</div>`;
 
@@ -880,11 +979,15 @@ async function exportB50Image() {
 
   // Temporarily add exporting class for background/padding
   capture.classList.add("exporting");
+  if (document.getElementById("b50-hide-if").checked) {
+    capture.classList.add("hide-if-cols");
+  }
 
   try {
     const canvas = await html2canvas(capture, {
       backgroundColor: "#1a1a2e",
       scale: 2,
+      useCORS: true,
     });
 
     const link = document.createElement("a");
@@ -893,9 +996,13 @@ async function exportB50Image() {
     link.click();
   } catch (err) {
     console.error("Export failed:", err);
-    alert("Export failed. Check console for details.");
+    if (err.name === "SecurityError" && location.protocol === "file:") {
+      alert("Export doesn't work from file:// due to browser security.\nPlease use a local server (e.g. npx serve) or the hosted version.");
+    } else {
+      alert("Export failed. Check console for details.");
+    }
   } finally {
-    capture.classList.remove("exporting");
+    capture.classList.remove("exporting", "hide-if-cols");
     btn.disabled = false;
     btn.textContent = "Export as Image";
   }

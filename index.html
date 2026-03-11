@@ -57,6 +57,7 @@
               <th data-col="accuracy">Acc%</th>
               <th data-col="rank">Rank</th>
               <th data-col="rating" class="sorted desc">Rating</th>
+              <th data-col="dxStars">DX</th>
               <th data-col="rating_s">if S</th>
               <th data-col="rating_sp">if S+</th>
               <th data-col="rating_ss">if SS</th>
@@ -96,6 +97,7 @@
         </label>
       </div>
       <div id="b50-version-list"></div>
+      <label><input type="checkbox" id="b50-hide-if" checked> Hide "if" columns in export</label>
       <button id="b50-export" type="button">Export as Image</button>
       <span id="b50-exclude-info" class="hidden"></span>
     </section>
@@ -137,12 +139,13 @@
               <th>Acc%</th>
               <th>Rank</th>
               <th>Rating</th>
-              <th>if S</th>
-              <th>if S+</th>
-              <th>if SS</th>
-              <th>if SS+</th>
-              <th>if SSS</th>
-              <th>if SSS+</th>
+              <th>DX</th>
+              <th class="col-if">if S</th>
+              <th class="col-if">if S+</th>
+              <th class="col-if">if SS</th>
+              <th class="col-if">if SS+</th>
+              <th class="col-if">if SSS</th>
+              <th class="col-if">if SSS+</th>
             </tr>
           </thead>
           <tbody id="b50-body"></tbody>
