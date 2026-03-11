@@ -2,6 +2,7 @@
 
 const DXDATA_URL =
   "https://raw.githubusercontent.com/gekichumai/dxrating/main/packages/dxdata/dxdata.json";
+const JACKET_CDN = "https://shama.dxrating.net/images/cover/v2";
 const SEGA_URL = "https://maimai.sega.jp/data/maimai_songs.json";
 
 // Rating table (myjian/mai-tools)
@@ -94,6 +95,7 @@ const DIFF_CLASS = {
 let chartConstants = {};
 let songCategories = {};
 let songVersions = {};
+let songImages = {}; // normalizedTitle → imageName (for jacket images)
 
 // Song name aliases: cache title (normalized, lowercase) → dxdata title (normalized, lowercase)
 const songAliases = {
@@ -272,6 +274,9 @@ async function fetchChartData() {
       if (song.category) {
         songCategories[title] = song.category;
       }
+      if (song.imageName) {
+        songImages[title] = song.imageName;
+      }
       for (const sheet of song.sheets || []) {
         const type = (sheet.type || "").toLowerCase();
         const diff = (sheet.difficulty || "").toLowerCase();
@@ -327,6 +332,7 @@ function processScores(cache) {
     const cleanTitleLower = normalizeTitle(cleanTitle).toLowerCase();
     const aliasTitle = songAliases[cleanTitleLower];
     const genre = songCategories[cleanTitleLower] || songCategories[rawTitleLower] || (aliasTitle && songCategories[aliasTitle]) || "";
+    const imageName = songImages[cleanTitleLower] || songImages[rawTitleLower] || (aliasTitle && songImages[aliasTitle]) || "";
 
     for (const diff of meta.difficulties || []) {
       const stats = diff.stats || {};
@@ -376,15 +382,19 @@ function processScores(cache) {
         chartType,
         version,
         genre,
+        imageName,
         playcount: plays,
         difficulty: alias,
         level: internalLv,
         levelFromServer: !!(lvMatch || override?.ilv),
         clear: CLEAR_LABELS[ct] || "",
+        clearType: ct,
         accuracy: acc,
         rank: getRankLabel(acc),
         rating: totalRating,
         internalLv,
+        dxScore: stats.dxScore || 0,
+        totalNotes: stats.totalNotesCount || 0,
         ...ratingIf,
       });
     }
@@ -653,6 +663,214 @@ function renderB50() {
   tbody.appendChild(fragment);
 }
 
+// ── Statistics ────────────────────────────────────────────────────────────────
+
+const DX_STAR_THRESHOLDS = [
+  { stars: 5, min: 97 },
+  { stars: 4, min: 95 },
+  { stars: 3, min: 93 },
+  { stars: 2, min: 90 },
+  { stars: 1, min: 85 },
+];
+
+function getDxStars(dxScore, totalNotes) {
+  if (!totalNotes || totalNotes <= 0) return 0;
+  const maxDx = totalNotes * 3;
+  const pct = (dxScore / maxDx) * 100;
+  for (const { stars, min } of DX_STAR_THRESHOLDS) {
+    if (pct >= min) return stars;
+  }
+  return 0;
+}
+
+function jacketUrl(imageName) {
+  if (!imageName) return "";
+  return `${JACKET_CDN}/${imageName}.jpg`;
+}
+
+function jacketImg(imageName, size) {
+  if (!imageName) return "";
+  const sz = size || 28;
+  return `<img class="stat-jacket" src="${jacketUrl(imageName)}" width="${sz}" height="${sz}" loading="lazy" onerror="this.style.display='none'">`;
+}
+
+function buildBar(label, value, max, color) {
+  const pct = max > 0 ? (value / max * 100) : 0;
+  return `<div class="stat-bar-row">
+    <span class="stat-bar-label">${label}</span>
+    <div class="stat-bar-track">
+      <div class="stat-bar-fill" style="width:${pct}%;background:${color}"></div>
+    </div>
+    <span class="stat-bar-value">${value}</span>
+  </div>`;
+}
+
+function renderStats() {
+  const container = document.getElementById("stats-container");
+  const scores = allScores;
+
+  // ── Play Summary ──
+  const totalPlays = scores.reduce((s, x) => s + x.playcount, 0);
+  const uniqueCharts = scores.length;
+  const avgPlays = uniqueCharts ? (totalPlays / uniqueCharts).toFixed(1) : "0";
+
+  // ── Most Played Charts (individual chart+difficulty) ──
+  const topCharts = [...scores].sort((a, b) => b.playcount - a.playcount).slice(0, 10);
+  const topChartMax = topCharts[0]?.playcount || 1;
+
+  // ── Version Breakdown ──
+  const versionPlays = new Map();
+  for (const s of scores) {
+    const v = s.version || "Unknown";
+    versionPlays.set(v, (versionPlays.get(v) || 0) + s.playcount);
+  }
+  const versionEntries = Array.from(versionPlays.entries())
+    .sort((a, b) => getVersionRank(a[0]) - getVersionRank(b[0]));
+  const versionMax = Math.max(...versionEntries.map(e => e[1]), 1);
+
+  // ── Genre Breakdown ──
+  const genrePlays = new Map();
+  for (const s of scores) {
+    const g = s.genre || "Unknown";
+    genrePlays.set(g, (genrePlays.get(g) || 0) + s.playcount);
+  }
+  const genreEntries = Array.from(genrePlays.entries()).sort((a, b) => b[1] - a[1]);
+  const genreMax = Math.max(...genreEntries.map(e => e[1]), 1);
+
+  // ── Difficulty Breakdown ──
+  const diffOrder = ["Basic", "Advanced", "Expert", "Master", "Re:Master"];
+  const diffColors = { Basic: "#22bb5b", Advanced: "#f0a030", Expert: "#ee4444", Master: "#bb66ee", "Re:Master": "#dda0ff" };
+  const diffPlays = new Map();
+  for (const s of scores) diffPlays.set(s.difficulty, (diffPlays.get(s.difficulty) || 0) + s.playcount);
+  const diffMax = Math.max(...diffOrder.map(d => diffPlays.get(d) || 0), 1);
+
+  // ── DX Stars ──
+  const starCounts = [0, 0, 0, 0, 0, 0];
+  for (const s of scores) {
+    starCounts[getDxStars(s.dxScore, s.totalNotes)]++;
+  }
+  const starMax = Math.max(...starCounts, 1);
+
+  // ── Rank Distribution ──
+  const rankOrder = ["D", "C", "B", "BB", "BBB", "A", "AA", "AAA", "S", "S+", "SS", "SS+", "SSS", "SSS+"];
+  const rankCounts = new Map();
+  for (const r of rankOrder) rankCounts.set(r, 0);
+  for (const s of scores) rankCounts.set(s.rank, (rankCounts.get(s.rank) || 0) + 1);
+  const rankMax = Math.max(...rankOrder.map(r => rankCounts.get(r) || 0), 1);
+
+  // ── Clear Type Distribution ──
+  const clearOrder = [
+    { key: "clear", label: "Clear", types: [0, 1, 2] },
+    { key: "fc", label: "FC", types: [3] },
+    { key: "fcp", label: "FC+", types: [4] },
+    { key: "ap", label: "AP", types: [5] },
+    { key: "app", label: "AP+", types: [6] },
+  ];
+  const clearColors = { clear: "#888", fc: "#44bbee", fcp: "#33ddaa", ap: "#ffcc44", app: "#ff8844" };
+  const clearCounts = {};
+  for (const c of clearOrder) clearCounts[c.key] = 0;
+  for (const s of scores) {
+    for (const c of clearOrder) {
+      if (c.types.includes(s.clearType)) { clearCounts[c.key]++; break; }
+    }
+  }
+  const clearMax = Math.max(...Object.values(clearCounts), 1);
+
+  // ── Build HTML ──
+  let html = `<div class="stats-grid">`;
+
+  // Play Summary
+  html += `<div class="stat-card stat-card-wide">
+    <h3>Play Summary</h3>
+    <div class="stat-summary-row">
+      <div class="stat-big"><span class="stat-big-num">${totalPlays.toLocaleString()}</span><span class="stat-big-label">Total Plays</span></div>
+      <div class="stat-big"><span class="stat-big-num">${uniqueCharts}</span><span class="stat-big-label">Charts Played</span></div>
+      <div class="stat-big"><span class="stat-big-num">${avgPlays}</span><span class="stat-big-label">Avg Plays/Chart</span></div>
+    </div>
+  </div>`;
+
+  // Most Played Charts
+  html += `<div class="stat-card stat-card-wide">
+    <h3>Most Played Charts</h3>
+    <div class="top-charts">`;
+  for (let i = 0; i < topCharts.length; i++) {
+    const s = topCharts[i];
+    const diffCls = DIFF_CLASS[s.difficulty] || "";
+    const jacket = s.imageName
+      ? `<img class="top-chart-jacket" src="${jacketUrl(s.imageName)}" loading="lazy" onerror="this.style.visibility='hidden'">`
+      : `<div class="top-chart-jacket top-chart-jacket-empty"></div>`;
+    const typeTag = s.chartType ? `[${s.chartType}]` : "";
+    const clearStr = s.clear || "";
+    html += `<div class="top-chart-row">
+      <span class="top-chart-rank">${i + 1}</span>
+      ${jacket}
+      <div class="top-chart-info">
+        <span class="top-chart-name ${diffCls}">${s.name} <span class="top-chart-type">${typeTag}</span></span>
+        <span class="top-chart-meta"><span class="${diffCls}">${s.difficulty}</span> <span class="top-chart-lv">${s.levelFromServer ? s.level.toFixed(1) : s.level.toFixed(0)}</span></span>
+      </div>
+      <div class="top-chart-stats">
+        <span class="top-chart-acc">${s.accuracy.toFixed(2)}%</span>
+        <span class="top-chart-rank-label">${s.rank}${clearStr ? " / " + clearStr : ""}</span>
+      </div>
+      <span class="top-chart-plays">${s.playcount} plays</span>
+    </div>`;
+  }
+  html += `</div></div>`;
+
+  // Version Breakdown
+  html += `<div class="stat-card">
+    <h3>Version Breakdown</h3>`;
+  for (const [v, count] of versionEntries) {
+    html += buildBar(versionName(v), count, versionMax, "#7c5cbf");
+  }
+  html += `</div>`;
+
+  // Genre Breakdown
+  html += `<div class="stat-card">
+    <h3>Genre Breakdown</h3>`;
+  for (const [g, count] of genreEntries) {
+    html += buildBar(g, count, genreMax, "#5c8abf");
+  }
+  html += `</div>`;
+
+  // Difficulty Breakdown
+  html += `<div class="stat-card">
+    <h3>Difficulty Breakdown</h3>`;
+  for (const d of diffOrder) {
+    html += buildBar(d, diffPlays.get(d) || 0, diffMax, diffColors[d] || "#7c5cbf");
+  }
+  html += `</div>`;
+
+  // DX Stars
+  html += `<div class="stat-card">
+    <h3>DX Score Stars</h3>`;
+  for (let i = 0; i <= 5; i++) {
+    const label = i === 0 ? "No stars" : "\u2605".repeat(i);
+    html += buildBar(label, starCounts[i], starMax, i === 0 ? "#555" : `hsl(${40 + i * 10}, 90%, ${50 + i * 5}%)`);
+  }
+  html += `</div>`;
+
+  // Rank Distribution
+  html += `<div class="stat-card">
+    <h3>Rank Distribution</h3>`;
+  for (const r of rankOrder) {
+    const c = rankCounts.get(r) || 0;
+    html += buildBar(r, c, rankMax, "#7c5cbf");
+  }
+  html += `</div>`;
+
+  // Clear Type Distribution
+  html += `<div class="stat-card">
+    <h3>Clear Type</h3>`;
+  for (const c of clearOrder) {
+    html += buildBar(c.label, clearCounts[c.key], clearMax, clearColors[c.key]);
+  }
+  html += `</div>`;
+
+  html += `</div>`;
+  container.innerHTML = html;
+}
+
 async function exportB50Image() {
   const btn = document.getElementById("b50-export");
   const capture = document.getElementById("b50-capture");
@@ -690,9 +908,13 @@ function switchTab(tab) {
   });
   document.getElementById("tab-all").classList.toggle("hidden", tab !== "all");
   document.getElementById("tab-b50").classList.toggle("hidden", tab !== "b50");
+  document.getElementById("tab-stats").classList.toggle("hidden", tab !== "stats");
 
   if (tab === "b50" && allScores.length > 0) {
     renderB50();
+  }
+  if (tab === "stats" && allScores.length > 0) {
+    renderStats();
   }
 }
 
