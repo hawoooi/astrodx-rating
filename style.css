@@ -167,10 +167,12 @@ header h1 {
 #table-section, #b50-table-section {
   max-width: 100%;
   overflow-x: auto;
+  overflow-y: visible;
 }
 
 #table-wrapper, #b50-table-wrapper {
   overflow-x: auto;
+  overflow-y: visible;
 }
 
 /* Difficulty colors */
@@ -181,6 +183,35 @@ header h1 {
 .diff-remaster, tr.diff-remaster td {
   color: #ddb0ff;
   text-shadow: 0 0 6px #bb66ee, 0 0 12px #9944cc;
+}
+
+/* Jacket tooltip on song name hover */
+.has-jacket {
+  position: relative;
+  cursor: default;
+}
+
+.has-jacket::after {
+  content: "";
+  display: none;
+  position: absolute;
+  top: 50%;
+  right: 100%;
+  transform: translateY(-50%);
+  margin-right: 6px;
+  width: 120px;
+  height: 120px;
+  background-size: cover;
+  background-position: center;
+  background-image: var(--jacket);
+  border-radius: 6px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+  z-index: 100;
+}
+
+.has-jacket:hover::after {
+  display: block;
 }
 
 /* Bold columns (Lv, Rating) */

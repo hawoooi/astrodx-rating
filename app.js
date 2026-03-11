@@ -487,7 +487,6 @@ function renderTable() {
       versionName(s.version),
       s.genre,
       s.playcount,
-      s.name,
     ];
 
     for (const val of cells) {
@@ -495,6 +494,15 @@ function renderTable() {
       td.textContent = val;
       tr.appendChild(td);
     }
+
+    // Name cell with jacket tooltip
+    const tdName = document.createElement("td");
+    tdName.textContent = s.name;
+    if (s.imageName) {
+      tdName.className = "has-jacket";
+      tdName.style.setProperty("--jacket", `url(${jacketUrl(s.imageName)})`);
+    }
+    tr.appendChild(tdName);
 
     // Lv (bold)
     const tdLv = document.createElement("td");
@@ -701,7 +709,6 @@ function renderB50() {
       versionName(s.version),
       s.genre,
       s.playcount,
-      s.name,
     ];
 
     for (const val of cells) {
@@ -709,6 +716,15 @@ function renderB50() {
       td.textContent = val;
       tr.appendChild(td);
     }
+
+    // Name cell with jacket tooltip
+    const tdName = document.createElement("td");
+    tdName.textContent = s.name;
+    if (s.imageName) {
+      tdName.className = "has-jacket";
+      tdName.style.setProperty("--jacket", `url(${jacketUrl(s.imageName)})`);
+    }
+    tr.appendChild(tdName);
 
     // Lv (bold)
     const tdLv = document.createElement("td");
