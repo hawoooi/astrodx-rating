@@ -299,9 +299,8 @@ header h1 {
 .b50-header-label.new { background: #2a9a8a; }
 
 .b50-header-value {
-  font-size: 1.1rem;
-  font-weight: 700;
-  color: #e0e0e0;
+  display: inline-flex;
+  align-items: center;
 }
 
 .b50-header-avg {
@@ -324,12 +323,37 @@ header h1 {
 }
 
 .b50-header-total-value {
-  background: linear-gradient(135deg, #c89520, #f0d060);
-  color: #2a2a2a;
-  font-weight: 800;
-  font-size: 15px;
-  padding: 2px 10px;
-  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Rating plate (maimai DX rating frame) */
+.rating-plate {
+  position: relative;
+  display: inline-block;
+  vertical-align: middle;
+  line-height: 0;
+  flex-shrink: 0;
+}
+.rating-plate-bg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.rating-plate-value {
+  position: absolute;
+  top: 50%;
+  right: 0.345em;
+  transform: translateY(-50%);
+  color: #fff;
+  font-family: 'Arial Black', Impact, system-ui, sans-serif;
+  font-weight: 900;
+  font-size: 0.490em;
+  letter-spacing: 0.070em;
+  line-height: 1;
+  white-space: nowrap;
+  text-shadow: 0 0.025em 0.05em rgba(0,0,0,0.85), 0 0 0.07em rgba(0,0,0,0.6);
 }
 
 #b50-footer {

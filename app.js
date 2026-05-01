@@ -86,6 +86,51 @@ function dxStarImg(stars, height) {
   return `<img class="icon-dxstar" src="${src}" height="${h}" alt="${stars} stars" title="${stars} DX stars">`;
 }
 
+const RATING_PLATE_IMAGES = {
+  normal:   "assets/rating_base_normal.png",
+  blue:     "assets/rating_base_blue.png",
+  green:    "assets/rating_base_green.png",
+  orange:   "assets/rating_base_orange.png",
+  red:      "assets/rating_base_red.png",
+  purple:   "assets/rating_base_purple.png",
+  bronze:   "assets/rating_base_bronze.png",
+  silver:   "assets/rating_base_silver.png",
+  gold:     "assets/rating_base_gold.png",
+  platinum: "assets/rating_base_platinum.png",
+  rainbow:  "assets/rating_base_rainbow.png",
+};
+const RATING_PLATE_ASPECT = 296 / 86;
+
+function getRatingTier(rating) {
+  if (rating >= 15000) return "rainbow";
+  if (rating >= 14500) return "platinum";
+  if (rating >= 14000) return "gold";
+  if (rating >= 13000) return "silver";
+  if (rating >= 12000) return "bronze";
+  if (rating >= 10000) return "purple";
+  if (rating >= 7000)  return "red";
+  if (rating >= 4000)  return "orange";
+  if (rating >= 2000)  return "green";
+  if (rating >= 1000)  return "blue";
+  return "normal";
+}
+
+// Tier for partial pools (OLD/NEW): extrapolate avg to a full B50 equivalent.
+function getPoolTier(sum, count) {
+  if (!count) return "normal";
+  return getRatingTier((sum / count) * 50);
+}
+
+function ratingPlateHtml(value, tier, height, srcOverride) {
+  const src = srcOverride || RATING_PLATE_IMAGES[tier] || RATING_PLATE_IMAGES.normal;
+  const w = (height * RATING_PLATE_ASPECT).toFixed(1);
+  // font-size = height makes 1em == plate height, so child em values scale.
+  return `<span class="rating-plate" style="height:${height}px;width:${w}px;font-size:${height}px;">`
+    + `<img class="rating-plate-bg" src="${src}" alt="">`
+    + `<span class="rating-plate-value">${value}</span>`
+    + `</span>`;
+}
+
 const RATING_IF_RANKS = [
   { key: "rating_s", rank: "S", minAchv: 97.0 },
   { key: "rating_sp", rank: "S+", minAchv: 98.0 },
@@ -635,12 +680,13 @@ function renderB50() {
   const oldSum = oldScores.reduce((s, x) => s + x.rating, 0);
   const total = newSum + oldSum;
 
-  document.getElementById("b50-new-sum").textContent = newSum;
-  document.getElementById("b50-old-sum").textContent = oldSum;
-  document.getElementById("b50-total").textContent = total;
+  const totalCount = newScores.length + oldScores.length;
+  const PLATE_H_LIVE = 44;
+  document.getElementById("b50-old-sum").innerHTML = ratingPlateHtml(oldSum, getPoolTier(oldSum, oldScores.length), PLATE_H_LIVE);
+  document.getElementById("b50-new-sum").innerHTML = ratingPlateHtml(newSum, getPoolTier(newSum, newScores.length), PLATE_H_LIVE);
+  document.getElementById("b50-total").innerHTML  = ratingPlateHtml(total,  getRatingTier(total),                     PLATE_H_LIVE);
   document.getElementById("b50-new-avg").textContent = newScores.length ? (newSum / newScores.length).toFixed(1) : "0";
   document.getElementById("b50-old-avg").textContent = oldScores.length ? (oldSum / oldScores.length).toFixed(1) : "0";
-  const totalCount = newScores.length + oldScores.length;
   document.getElementById("b50-total-avg").textContent = totalCount ? (total / totalCount).toFixed(1) : "0";
 
   // Build row list — separate (NEW block then OLD block) or combined (single sorted list)
@@ -1103,6 +1149,16 @@ async function exportB50Image() {
       assetMap["clear_" + k] = await assetToDataUrl(v);
     for (const [k, v] of Object.entries(DXSTAR_IMAGES))
       assetMap["dx_" + k] = await assetToDataUrl(v);
+    for (const [k, v] of Object.entries(RATING_PLATE_IMAGES))
+      assetMap["plate_" + k] = await assetToDataUrl(v);
+
+    const PLATE_H_EXPORT = 64;
+    const oldTier = getPoolTier(oldSum, oldScores.length);
+    const newTier = getPoolTier(newSum, newScores.length);
+    const totalTier = getRatingTier(total);
+    const oldPlate = ratingPlateHtml(oldSum, oldTier, PLATE_H_EXPORT, assetMap["plate_" + oldTier]);
+    const newPlate = ratingPlateHtml(newSum, newTier, PLATE_H_EXPORT, assetMap["plate_" + newTier]);
+    const totalPlate = ratingPlateHtml(total, totalTier, PLATE_H_EXPORT, assetMap["plate_" + totalTier]);
 
     function makeExportCard(s) {
       const diffCls = ALIAS_TO_DIFF[s.difficulty] || "expert";
@@ -1216,17 +1272,28 @@ body {
 }
 .b50-header-label.old { background: #c83858; }
 .b50-header-label.new { background: #2a9a8a; }
-.b50-header-value { font-size: 1.65rem; font-weight: 700; color: #e0e0e0; }
+.b50-header-value { display: inline-flex; align-items: center; }
 .b50-header-avg { font-size: 1.125rem; color: #666; }
 .b50-header-total { display: flex; align-items: center; gap: 0.75rem; }
 .b50-header-total-label {
   font-size: 16px; font-weight: 700; text-transform: uppercase;
   letter-spacing: 1.5px; color: #888;
 }
-.b50-header-total-value {
-  background: linear-gradient(135deg, #c89520, #f0d060);
-  color: #2a2a2a; font-weight: 800; font-size: 22px;
-  padding: 3px 15px; border-radius: 6px;
+.b50-header-total-value { display: inline-flex; align-items: center; }
+.rating-plate {
+  position: relative; display: inline-block; vertical-align: middle;
+  line-height: 0; flex-shrink: 0;
+}
+.rating-plate-bg {
+  display: block; width: 100%; height: 100%; pointer-events: none;
+}
+.rating-plate-value {
+  position: absolute; top: 50%; right: 0.345em;
+  transform: translateY(-50%); color: #fff;
+  font-family: 'Arial Black', Impact, system-ui, sans-serif;
+  font-weight: 900; font-size: 0.490em; letter-spacing: 0.070em;
+  line-height: 1; white-space: nowrap;
+  text-shadow: 0 0.025em 0.05em rgba(0,0,0,0.85), 0 0 0.07em rgba(0,0,0,0.6);
 }
 /* Grid layout — all values 1.5x for export */
 .tp-grids-row { display: flex; gap: 12px; align-items: flex-start; background: rgba(0,0,0,0.25); border-radius: 12px; padding: 12px; }
@@ -1327,18 +1394,18 @@ body {
     <div class="b50-header-stats">
       <div class="b50-header-block">
         <span class="b50-header-label old">OLD ${oldScores.length}</span>
-        <span class="b50-header-value">${oldSum}</span>
+        <span class="b50-header-value">${oldPlate}</span>
         <span class="b50-header-avg">avg ${oldScores.length ? (oldSum / oldScores.length).toFixed(1) : "0"}</span>
       </div>
       <div class="b50-header-block">
         <span class="b50-header-label new">NEW ${newScores.length}</span>
-        <span class="b50-header-value">${newSum}</span>
+        <span class="b50-header-value">${newPlate}</span>
         <span class="b50-header-avg">avg ${newScores.length ? (newSum / newScores.length).toFixed(1) : "0"}</span>
       </div>
     </div>
     <div class="b50-header-total">
       <span class="b50-header-total-label">TOTAL</span>
-      <span class="b50-header-total-value">${total}</span>
+      <span class="b50-header-total-value">${totalPlate}</span>
       <span class="b50-header-avg">avg ${totalCount ? (total / totalCount).toFixed(1) : "0"}</span>
     </div>
   </div>

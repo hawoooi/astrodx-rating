@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Rating Plate Test</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #1a1a2e;
+    color: #ddd;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    padding: 1.25rem 1.5rem 4rem;
+    min-height: 100vh;
+  }
+  h1 { font-size: 1.25rem; margin-bottom: 1rem; }
+  h2 {
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #888;
+    margin: 1.6rem 0 0.7rem;
+    border-bottom: 1px solid #333;
+    padding-bottom: 0.35rem;
+  }
+
+  /* ── Plate component (the part being tuned) ───────────────────────────────
+     The plate sets `font-size: <height>px` inline, so 1em == plate height.
+     Every value inside uses em → everything scales with the image.
+     Text is right-anchored: no width, no text-align needed.
+  */
+  .rating-plate {
+    position: relative;
+    display: inline-block;
+    vertical-align: middle;
+    line-height: 0;
+    flex-shrink: 0;
+  }
+  .rating-plate-bg {
+    display: block;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+  }
+  .rating-plate-value {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #fff;
+    font-family: 'Arial Black', Impact, system-ui, sans-serif;
+    font-weight: 900;
+    line-height: 1;
+    white-space: nowrap;
+    text-shadow:
+      0 0.025em 0.05em rgba(0, 0, 0, 0.85),
+      0 0      0.07em rgba(0, 0, 0, 0.6);
+    /* Tunable via CSS vars (all em → scale with plate height): */
+    right:          calc(var(--rp-right, 0.345) * 1em);
+    font-size:      calc(var(--rp-fs,    0.490) * 1em);
+    letter-spacing: calc(var(--rp-ls,    0.070) * 1em);
+  }
+
+  /* ── Layout ────────────────────────────────────────────────────────────── */
+  .row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem 1.5rem;
+    align-items: center;
+    margin-bottom: 1rem;
+  }
+  .swatch {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.4rem;
+  }
+  .swatch-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #888;
+  }
+
+  /* Sliders */
+  .controls {
+    background: #16213e;
+    border-radius: 8px;
+    padding: 1rem 1.25rem;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 0.75rem 1.25rem;
+    margin-bottom: 1.25rem;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  }
+  .ctl {
+    display: grid;
+    grid-template-columns: 110px 1fr 64px;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.78rem;
+  }
+  .ctl label { color: #aaa; }
+  .ctl input[type=range] { width: 100%; }
+  .ctl output {
+    text-align: right;
+    color: #ffd860;
+    font-variant-numeric: tabular-nums;
+    font-family: ui-monospace, SFMono-Regular, monospace;
+  }
+  .ctl-reset {
+    grid-column: 1 / -1;
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+  }
+  .ctl-reset button {
+    background: #7c5cbf;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    padding: 0.3rem 0.8rem;
+    font-size: 0.75rem;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .ctl-reset button:hover { background: #9370db; }
+  .ctl-reset code {
+    flex: 1;
+    background: #0f1726;
+    padding: 0.3rem 0.55rem;
+    border-radius: 4px;
+    font-size: 0.72rem;
+    color: #ccc;
+    font-family: ui-monospace, SFMono-Regular, monospace;
+    white-space: nowrap;
+    overflow-x: auto;
+  }
+
+  /* Mock host containers like the app uses */
+  .mock-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 8px 14px;
+    border-radius: 8px;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+  .mock-header.export-scale {
+    padding: 12px 21px;
+    border-radius: 12px;
+    gap: 1.5rem;
+  }
+  .mock-block {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+  }
+  .mock-label {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    padding: 2px 10px;
+    border-radius: 4px;
+    color: #fff;
+  }
+  .export-scale .mock-label {
+    font-size: 16px;
+    letter-spacing: 1.5px;
+    padding: 3px 15px;
+    border-radius: 6px;
+  }
+  .mock-label.old { background: #c83858; }
+  .mock-label.new { background: #2a9a8a; }
+  .mock-label.total { background: transparent; color: #888; }
+  .mock-avg { font-size: 0.75rem; color: #666; }
+  .export-scale .mock-avg { font-size: 1.125rem; }
+</style>
+</head>
+<body>
+  <h1>Rating Plate — Sizing &amp; Positioning Playground</h1>
+
+  <!-- Live tuning controls -->
+  <div class="controls">
+    <div class="ctl">
+      <label for="rp-fs">font-size</label>
+      <input id="rp-fs" type="range" min="0.20" max="1.10" step="0.005" value="0.490">
+      <output id="rp-fs-out">0.490em</output>
+    </div>
+    <div class="ctl">
+      <label for="rp-ls">letter-spacing</label>
+      <input id="rp-ls" type="range" min="-0.05" max="0.40" step="0.005" value="0.070">
+      <output id="rp-ls-out">0.070em</output>
+    </div>
+    <div class="ctl">
+      <label for="rp-right">right offset</label>
+      <input id="rp-right" type="range" min="0" max="0.60" step="0.005" value="0.345">
+      <output id="rp-right-out">0.345em</output>
+    </div>
+    <div class="ctl-reset">
+      <button id="reset">Reset defaults</button>
+      <code id="snippet"></code>
+    </div>
+  </div>
+
+  <h2>All tiers @ 64px (export size)</h2>
+  <div class="row" id="row-export"></div>
+
+  <h2>All tiers @ 44px (live header size)</h2>
+  <div class="row" id="row-live"></div>
+
+  <h2>Mock live header @ 44px</h2>
+  <div class="mock-header">
+    <div class="mock-block">
+      <span class="mock-label old">OLD 35</span>
+      <span id="mock-old-live"></span>
+      <span class="mock-avg">avg 240.0</span>
+    </div>
+    <div class="mock-block">
+      <span class="mock-label new">NEW 15</span>
+      <span id="mock-new-live"></span>
+      <span class="mock-avg">avg 300.5</span>
+    </div>
+    <div class="mock-block">
+      <span class="mock-label total">TOTAL</span>
+      <span id="mock-total-live"></span>
+      <span class="mock-avg">avg 258.1</span>
+    </div>
+  </div>
+
+  <h2>Mock export header @ 64px (1.5×)</h2>
+  <div class="mock-header export-scale">
+    <div class="mock-block">
+      <span class="mock-label old">OLD 35</span>
+      <span id="mock-old-export"></span>
+      <span class="mock-avg">avg 240.0</span>
+    </div>
+    <div class="mock-block">
+      <span class="mock-label new">NEW 15</span>
+      <span id="mock-new-export"></span>
+      <span class="mock-avg">avg 300.5</span>
+    </div>
+    <div class="mock-block">
+      <span class="mock-label total">TOTAL</span>
+      <span id="mock-total-export"></span>
+      <span class="mock-avg">avg 258.1</span>
+    </div>
+  </div>
+
+  <h2>Edge cases (digit count varies — text stays right-anchored)</h2>
+  <div class="row" id="row-edge"></div>
+
+  <h2>Scale check — same value, sizes 32 / 44 / 64 / 96 / 140 / 200 px</h2>
+  <p style="color:#888;font-size:0.78rem;margin-bottom:0.6rem;">
+    All metrics are em-based, so changing only the height should preserve identical proportions.
+  </p>
+  <div class="row" id="row-scale"></div>
+</body>
+<script>
+const TIERS = [
+  ["normal",   500],
+  ["blue",    1500],
+  ["green",   3200],
+  ["orange",  5500],
+  ["red",     8800],
+  ["purple", 11000],
+  ["bronze", 12500],
+  ["silver", 13500],
+  ["gold",   14250],
+  ["platinum", 14750],
+  ["rainbow", 15800],
+];
+const PLATE_ASPECT = 296 / 86;
+
+function plate(value, tier, height) {
+  const w = (height * PLATE_ASPECT).toFixed(1);
+  const span = document.createElement("span");
+  span.className = "rating-plate";
+  // Setting font-size = height makes 1em == plate height for all children.
+  span.style.cssText = `height:${height}px;width:${w}px;font-size:${height}px;`;
+  span.innerHTML =
+    `<img class="rating-plate-bg" src="assets/rating_base_${tier}.png" alt="">` +
+    `<span class="rating-plate-value">${value}</span>`;
+  return span;
+}
+
+function swatch(value, tier, height, labelText) {
+  const wrap = document.createElement("div");
+  wrap.className = "swatch";
+  wrap.appendChild(plate(value, tier, height));
+  const lbl = document.createElement("div");
+  lbl.className = "swatch-label";
+  lbl.textContent = labelText || tier;
+  wrap.appendChild(lbl);
+  return wrap;
+}
+
+function fillRow(id, height, tiers) {
+  const el = document.getElementById(id);
+  el.innerHTML = "";
+  for (const [t, v] of tiers) el.appendChild(swatch(v, t, height));
+}
+
+function fillMocks() {
+  const map = [
+    ["mock-old-live",     8400, "silver",   44],
+    ["mock-new-live",     4500, "rainbow",  44],
+    ["mock-total-live",  12900, "bronze",   44],
+    ["mock-old-export",   8400, "silver",   64],
+    ["mock-new-export",   4500, "rainbow",  64],
+    ["mock-total-export",12900, "bronze",   64],
+  ];
+  for (const [id, v, t, h] of map) {
+    const host = document.getElementById(id);
+    host.innerHTML = "";
+    host.appendChild(plate(v, t, h));
+  }
+}
+
+function fillEdge() {
+  const el = document.getElementById("row-edge");
+  el.innerHTML = "";
+  el.appendChild(swatch(8,     "normal",  64, "1 digit"));
+  el.appendChild(swatch(42,    "blue",    64, "2 digits"));
+  el.appendChild(swatch(800,   "green",   64, "3 digits"));
+  el.appendChild(swatch(8400,  "silver",  64, "4 digits"));
+  el.appendChild(swatch(15523, "rainbow", 64, "5 digits"));
+}
+
+function fillScale() {
+  const el = document.getElementById("row-scale");
+  el.innerHTML = "";
+  for (const h of [32, 44, 64, 96, 140, 200]) {
+    el.appendChild(swatch(15052, "rainbow", h, h + "px"));
+  }
+}
+
+function renderAll() {
+  fillRow("row-export", 64, TIERS);
+  fillRow("row-live",   44, TIERS);
+  fillEdge();
+  fillScale();
+  fillMocks();
+}
+renderAll();
+
+// Live CSS-var tuning
+function pushVars() {
+  const root = document.documentElement.style;
+  const fs    = +document.getElementById("rp-fs").value;
+  const ls    = +document.getElementById("rp-ls").value;
+  const right = +document.getElementById("rp-right").value;
+  root.setProperty("--rp-fs",    fs);
+  root.setProperty("--rp-ls",    ls);
+  root.setProperty("--rp-right", right);
+
+  document.getElementById("rp-fs-out").textContent    = fs.toFixed(3) + "em";
+  document.getElementById("rp-ls-out").textContent    = ls.toFixed(3) + "em";
+  document.getElementById("rp-right-out").textContent = right.toFixed(3) + "em";
+
+  document.getElementById("snippet").textContent =
+    `font-size:${fs.toFixed(3)}em; letter-spacing:${ls.toFixed(3)}em; right:${right.toFixed(3)}em;`;
+}
+
+for (const k of ["fs", "ls", "right"]) {
+  document.getElementById("rp-" + k).addEventListener("input", pushVars);
+}
+
+document.getElementById("reset").addEventListener("click", () => {
+  document.getElementById("rp-fs").value    = 0.490;
+  document.getElementById("rp-ls").value    = 0.070;
+  document.getElementById("rp-right").value = 0.345;
+  pushVars();
+});
+
+pushVars();
+</script>
+</html>
