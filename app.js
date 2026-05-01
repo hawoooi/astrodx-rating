@@ -156,7 +156,7 @@ const VERSION_NAMES = {
   199: "FiNALE", 200: "maimaiDX", 205: "maimaiDX+", 210: "Splash",
   215: "Splash+", 220: "UNiVERSE", 225: "UNiVERSE+", 230: "FESTiVAL",
   235: "FESTiVAL+", 240: "BUDDiES", 245: "BUDDiES+", 250: "PRiSM",
-  255: "PRiSM+", 260: "CiRCLE",
+  255: "PRiSM+", 260: "CiRCLE", 265: "CiRCLE+",
 };
 
 function versionName(v) {
@@ -193,10 +193,28 @@ const songAliases = {
   "フェイスフェイク・フェイルセイフ": "フェイクフェイス・フェイルセイフ",
 };
 // Manual chart data for songs missing from server. Fallback only.
-// Key: "title (lowercase)|type|difficulty" → { ilv, version, category }
+// Key: "title (lowercase)|type|difficulty" → { ilv, version, category, image? }
+// `image` (relative asset path) attaches to the song; only needs to be set on
+// one difficulty per song — derived per-title via `localSongMeta` below.
 const chartOverrides = {
-  "break the speakers|dx|master": { ilv: 14.7, version: "CiRCLE", category: null },
+  "break the speakers|dx|basic":    { ilv: 5.0,  version: "CiRCLE PLUS", category: "maimai" },
+  "break the speakers|dx|advanced": { ilv: 8.7,  version: "CiRCLE PLUS", category: "maimai" },
+  "break the speakers|dx|expert":   { ilv: 12.7, version: "CiRCLE PLUS", category: "maimai" },
+  "break the speakers|dx|master":   { ilv: 14.7, version: "CiRCLE PLUS", category: "maimai", image: "assets/fillers/BreakTheSpeakers.png" },
 };
+
+// Per-title fallback metadata derived from chartOverrides.
+// Keyed by lowercased title → { image, category } (first non-null wins).
+const localSongMeta = (() => {
+  const out = {};
+  for (const [key, v] of Object.entries(chartOverrides)) {
+    const title = key.split("|")[0];
+    if (!out[title]) out[title] = {};
+    if (v.image    && !out[title].image)    out[title].image    = v.image;
+    if (v.category && !out[title].category) out[title].category = v.category;
+  }
+  return out;
+})();
 
 let allScores = [];
 let filteredScores = [];
@@ -205,10 +223,11 @@ let sortAsc = false;
 let activeTab = "all";
 
 // B50 state
-let b50NewCount = 2;
+let b50NewVersions = new Set();    // versions the user marked as "new" pool
 let b50IgnoreNewer = false;
 let b50Combined = false;
 let b50Excluded = new Set(); // keys of scores excluded from B50
+const B50_DEFAULT_NEW_COUNT = 2;   // # newest versions auto-selected on load / Latest button
 
 // ── Rating functions ─────────────────────────────────────────────────────────
 
@@ -244,6 +263,44 @@ function parseLevel(value) {
   }
   const n = parseFloat(s);
   return isNaN(n) ? 0 : n;
+}
+
+// ── Level filter helpers ─────────────────────────────────────────────────────
+const VISIBLE_LEVELS = [
+  "1","2","3","4","5","6",
+  "7","7+","8","8+","9","9+",
+  "10","10+","11","11+","12","12+",
+  "13","13+","14","14+","15"
+];
+
+// Constant range [start, end] for a visible label.
+// "X"  → [X.0, X.6]; "X+" → [X.7, X.9]; "15" capped at [15.0, 15.0].
+function visibleLevelRange(label) {
+  if (label === "15") return [15.0, 15.0];
+  const isPlus = label.endsWith("+");
+  const n = parseInt(isPlus ? label.slice(0, -1) : label, 10);
+  if (isPlus) return [+(n + 0.7).toFixed(1), +(n + 0.9).toFixed(1)];
+  return [n, +(n + 0.6).toFixed(1)];
+}
+
+function constantToVisibleLabel(c) {
+  if (c >= 15.0) return "15";
+  const floor = Math.floor(c);
+  return (c - floor) >= 0.7 ? floor + "+" : String(floor);
+}
+
+// Snap min DOWN to the start of the visible level it falls in.
+function snapMinDown(c) {
+  if (c >= 15.0) return 15.0;
+  const floor = Math.floor(c);
+  return (c - floor) >= 0.7 ? +(floor + 0.7).toFixed(1) : floor;
+}
+
+// Snap max UP to the end of the visible level it falls in.
+function snapMaxUp(c) {
+  if (c >= 15.0) return 15.0;
+  const floor = Math.floor(c);
+  return (c - floor) >= 0.7 ? +(floor + 0.9).toFixed(1) : +(floor + 0.6).toFixed(1);
 }
 
 // Normalize fullwidth/special chars for matching (cache vs dxdata differences)
@@ -319,7 +376,7 @@ const DX_VERSIONS = new Set([
   "FESTiVAL", "FESTiVAL PLUS",
   "BUDDiES", "BUDDiES PLUS",
   "PRiSM", "PRiSM PLUS",
-  "CiRCLE",
+  "CiRCLE", "CiRCLE PLUS",
 ]);
 
 // Ordered list of all maimai versions (oldest → newest) for B50 sorting
@@ -333,7 +390,7 @@ const VERSION_ORDER = [
   "FESTiVAL", "FESTiVAL PLUS",
   "BUDDiES", "BUDDiES PLUS",
   "PRiSM", "PRiSM PLUS",
-  "CiRCLE",
+  "CiRCLE", "CiRCLE PLUS",
 ];
 const VERSION_RANK = {};
 VERSION_ORDER.forEach((v, i) => { VERSION_RANK[v] = i; });
@@ -418,8 +475,16 @@ function processScores(cache) {
     const rawTitleLower = normalizeTitle(rawTitle).toLowerCase();
     const cleanTitleLower = normalizeTitle(cleanTitle).toLowerCase();
     const aliasTitle = songAliases[cleanTitleLower];
-    const genre = songCategories[cleanTitleLower] || songCategories[rawTitleLower] || (aliasTitle && songCategories[aliasTitle]) || "";
-    const imageName = songImages[cleanTitleLower] || songImages[rawTitleLower] || (aliasTitle && songImages[aliasTitle]) || "";
+    const localMeta = localSongMeta[cleanTitleLower] || localSongMeta[rawTitleLower] || {};
+    // Override values win when set; API fills in only what the override leaves blank.
+    const genre = localMeta.category
+      || songCategories[cleanTitleLower] || songCategories[rawTitleLower]
+      || (aliasTitle && songCategories[aliasTitle])
+      || "";
+    const imageName = localMeta.image
+      || songImages[cleanTitleLower] || songImages[rawTitleLower]
+      || (aliasTitle && songImages[aliasTitle])
+      || "";
 
     for (const diff of meta.difficulties || []) {
       const stats = diff.stats || {};
@@ -432,11 +497,12 @@ function processScores(cache) {
       const ct = stats.clearType || 0;
 
       const lvMatch = lookupChart(chartConstants, rawTitleLower, cleanTitleLower, alias, typeHint);
-      const override = !lvMatch ? lookupOverride(cleanTitleLower, alias, typeHint) : null;
-      const internalLv = lvMatch ? lvMatch.value : (override?.ilv ?? parseLevel(value));
+      // Always look up override; per-field, override wins when set.
+      const override = lookupOverride(cleanTitleLower, alias, typeHint);
+      const internalLv = override?.ilv ?? (lvMatch ? lvMatch.value : parseLevel(value));
 
       const verMatch = lookupChart(songVersions, rawTitleLower, cleanTitleLower, alias, typeHint);
-      const version = verMatch ? verMatch.value : (override?.version ?? "");
+      const version = override?.version || (verMatch ? verMatch.value : "");
 
       // Determine chart type: from [DX]/[ST] prefix, matched sheet type, or version era
       let chartType = "";
@@ -600,6 +666,94 @@ function renderTable() {
   info.textContent = `${filteredScores.length} scores`;
 }
 
+// Level filter state — defaults cover the full 1.0–15.0 range (no filter).
+let levelMin = 1.0;
+let levelMax = 15.0;
+let levelMode = "visible";
+
+function syncVisibleInputs() {
+  document.getElementById("level-min-visible").value = constantToVisibleLabel(levelMin);
+  document.getElementById("level-max-visible").value = constantToVisibleLabel(levelMax);
+}
+function syncConstantInputs() {
+  document.getElementById("level-min-constant").value = levelMin.toFixed(1);
+  document.getElementById("level-max-constant").value = levelMax.toFixed(1);
+}
+
+function initLevelFilter() {
+  const minSel = document.getElementById("level-min-visible");
+  const maxSel = document.getElementById("level-max-visible");
+  for (const lv of VISIBLE_LEVELS) {
+    minSel.add(new Option(lv, lv));
+    maxSel.add(new Option(lv, lv));
+  }
+  // Defaults: full range
+  minSel.value = "1";
+  maxSel.value = "15";
+  syncConstantInputs();
+
+  minSel.addEventListener("change", () => {
+    levelMin = visibleLevelRange(minSel.value)[0];
+    if (levelMin > levelMax) { levelMax = visibleLevelRange(minSel.value)[1]; syncVisibleInputs(); }
+    syncConstantInputs();
+    applyFilters();
+  });
+  maxSel.addEventListener("change", () => {
+    levelMax = visibleLevelRange(maxSel.value)[1];
+    if (levelMax < levelMin) { levelMin = visibleLevelRange(maxSel.value)[0]; syncVisibleInputs(); }
+    syncConstantInputs();
+    applyFilters();
+  });
+
+  const minIn = document.getElementById("level-min-constant");
+  const maxIn = document.getElementById("level-max-constant");
+  minIn.addEventListener("input", () => {
+    const v = parseFloat(minIn.value);
+    if (!isNaN(v)) {
+      levelMin = Math.max(1.0, Math.min(15.0, v));
+      applyFilters();
+    }
+  });
+  maxIn.addEventListener("input", () => {
+    const v = parseFloat(maxIn.value);
+    if (!isNaN(v)) {
+      levelMax = Math.max(1.0, Math.min(15.0, v));
+      applyFilters();
+    }
+  });
+
+  // Mode toggle
+  document.querySelectorAll(".level-mode-toggle button").forEach(btn => {
+    btn.addEventListener("click", () => {
+      levelMode = btn.dataset.mode;
+      document.querySelectorAll(".level-mode-toggle button")
+        .forEach(b => b.classList.toggle("active", b === btn));
+      document.querySelector(".visible-inputs").classList.toggle("hidden", levelMode !== "visible");
+      document.querySelector(".constant-inputs").classList.toggle("hidden", levelMode !== "constant");
+      // Switching to visible: auto-snap so the dropdown actually reflects the filter.
+      if (levelMode === "visible") {
+        const before = [levelMin, levelMax];
+        levelMin = snapMinDown(levelMin);
+        levelMax = snapMaxUp(levelMax);
+        syncVisibleInputs();
+        syncConstantInputs();
+        if (before[0] !== levelMin || before[1] !== levelMax) applyFilters();
+      } else {
+        syncConstantInputs();
+      }
+    });
+  });
+
+  // Snap button: expand range outward to nearest visible-level boundaries.
+  document.getElementById("level-snap").addEventListener("click", () => {
+    levelMin = snapMinDown(levelMin);
+    levelMax = snapMaxUp(levelMax);
+    syncVisibleInputs();
+    syncConstantInputs();
+    applyFilters();
+  });
+}
+
 function applyFilters() {
   const query = document.getElementById("search").value.toLowerCase();
   const checkedDiffs = new Set(
@@ -607,9 +761,14 @@ function applyFilters() {
       .map(cb => cb.value)
   );
 
+  // Use ±0.0001 tolerance for float comparison.
+  const minTol = levelMin - 0.0001;
+  const maxTol = levelMax + 0.0001;
+
   filteredScores = allScores.filter(s => {
     if (!checkedDiffs.has(s.difficulty)) return false;
     if (query && !s.name.toLowerCase().includes(query)) return false;
+    if (s.level < minTol || s.level > maxTol) return false;
     return true;
   });
 
@@ -622,27 +781,74 @@ function scoreKey(s) {
   return `${s.name.toLowerCase()}|${s.chartType}|${s.difficulty}`;
 }
 
-function computeBest50() {
-  // Collect unique versions present in scores
-  const versionSet = new Set();
+// Returns the unique versions present in allScores, sorted newest-first.
+function getAvailableVersions() {
+  const set = new Set();
   for (const s of allScores) {
-    if (s.version && getVersionRank(s.version) >= 0) {
-      versionSet.add(s.version);
+    if (s.version && getVersionRank(s.version) >= 0) set.add(s.version);
+  }
+  return Array.from(set).sort((a, b) => getVersionRank(b) - getVersionRank(a));
+}
+
+// Build the version-checkbox UI from played scores. Called on file load.
+// Preserves any prior selection that's still valid.
+function setupB50VersionPicker() {
+  const host = document.getElementById("b50-version-checks");
+  const wrap = document.getElementById("b50-new-versions");
+  if (!host) return;
+
+  const versions = getAvailableVersions();
+  if (versions.length === 0) {
+    wrap.classList.add("hidden");
+    return;
+  }
+  wrap.classList.remove("hidden");
+
+  // Drop versions from b50NewVersions that are no longer present.
+  for (const v of Array.from(b50NewVersions)) {
+    if (!versions.includes(v)) b50NewVersions.delete(v);
+  }
+  // First-time setup: default to the newest N.
+  if (b50NewVersions.size === 0) {
+    for (const v of versions.slice(0, B50_DEFAULT_NEW_COUNT)) b50NewVersions.add(v);
+  }
+
+  host.innerHTML = "";
+  for (const v of versions) {
+    const label = document.createElement("label");
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.value = String(v);
+    cb.checked = b50NewVersions.has(v);
+    label.classList.toggle("checked", cb.checked);
+    cb.addEventListener("change", () => {
+      if (cb.checked) b50NewVersions.add(v);
+      else b50NewVersions.delete(v);
+      label.classList.toggle("checked", cb.checked);
+      renderB50();
+    });
+    label.appendChild(cb);
+    label.appendChild(document.createTextNode(versionName(v)));
+    host.appendChild(label);
+  }
+}
+
+function setB50NewVersions(versions) {
+  b50NewVersions = new Set(versions);
+  // Refresh checkbox visual state without rebuilding the DOM.
+  const host = document.getElementById("b50-version-checks");
+  if (host) {
+    for (const cb of host.querySelectorAll("input[type=checkbox]")) {
+      cb.checked = b50NewVersions.has(cb.value);
+      cb.parentElement.classList.toggle("checked", cb.checked);
     }
   }
+  renderB50();
+}
 
-  // Sort versions by rank (newest first)
-  const sortedVersions = Array.from(versionSet).sort((a, b) => getVersionRank(b) - getVersionRank(a));
-
-  // Update version list display
-  const listEl = document.getElementById("b50-version-list");
-  if (listEl) {
-    const newVers = sortedVersions.slice(0, b50NewCount);
-    const oldVers = sortedVersions.slice(b50NewCount);
-    listEl.textContent = `New: ${newVers.map(versionName).join(", ") || "—"}  |  Old: ${oldVers.length} versions`;
-  }
-
-  const newVersions = new Set(sortedVersions.slice(0, b50NewCount));
+function computeBest50() {
+  // Use the user-selected "new" versions directly.
+  const newVersions = b50NewVersions;
 
   // Determine max allowed version rank (for ignore-newer feature)
   let maxRank = Infinity;
@@ -910,6 +1116,8 @@ function getDxStars(dxScore, totalNotes) {
 
 function jacketUrl(imageName) {
   if (!imageName) return "";
+  // Local fallback (path already starts with "assets/")
+  if (imageName.startsWith("assets/")) return imageName;
   return `${JACKET_CDN}/${imageName}.jpg`;
 }
 
@@ -1151,8 +1359,16 @@ async function exportB50Image() {
       assetMap["dx_" + k] = await assetToDataUrl(v);
     for (const [k, v] of Object.entries(RATING_PLATE_IMAGES))
       assetMap["plate_" + k] = await assetToDataUrl(v);
+    // Local-jacket fallbacks (relative paths) — embed as data URLs so the
+    // standalone export window can render them without resolving relative URLs.
+    const localJacketSet = new Set();
+    for (const s of [...newScores, ...oldScores]) {
+      if (s.imageName && s.imageName.startsWith("assets/")) localJacketSet.add(s.imageName);
+    }
+    for (const path of localJacketSet)
+      assetMap["jacket_" + path] = await assetToDataUrl(path);
 
-    const PLATE_H_EXPORT = 64;
+    const PLATE_H_EXPORT = 48;
     const oldTier = getPoolTier(oldSum, oldScores.length);
     const newTier = getPoolTier(newSum, newScores.length);
     const totalTier = getRatingTier(total);
@@ -1165,7 +1381,9 @@ async function exportB50Image() {
       const isDX = s.chartType === "DX";
       const lvText = s.levelFromServer ? s.level.toFixed(1) : s.level.toFixed(0);
       const jacketSrc = s.imageName
-        ? IMG_PROXY + encodeURIComponent(jacketUrl(s.imageName))
+        ? (s.imageName.startsWith("assets/")
+            ? assetMap["jacket_" + s.imageName]
+            : IMG_PROXY + encodeURIComponent(jacketUrl(s.imageName)))
         : "";
       const artHtml = jacketSrc
         ? `<img class="tp-card-art" src="${jacketSrc}" crossorigin="anonymous" onerror="this.style.visibility='hidden'">`
@@ -1334,7 +1552,8 @@ body {
 .tp-card-type {
   display: flex; align-items: center; justify-content: center;
   font-size: 12px; font-weight: 800; flex-shrink: 0;
-  padding: 3px 8px; border-radius: 3px; line-height: 1; margin-left: auto;
+  width: 1.9em; height: 1.9em; padding: 0;
+  border-radius: 3px; line-height: 1; margin-left: auto;
 }
 .tp-card-type.dx  { background: rgba(255,255,255,0.15); color: #ddd; }
 .tp-card-type.std { background: rgba(50,100,170,0.4); color: #aaccee; }
@@ -1516,15 +1735,21 @@ function setupEvents() {
     cb.addEventListener("change", applyFilters);
   });
 
+  // Level filter
+  initLevelFilter();
+
   // Tabs
   document.querySelectorAll(".tab").forEach(t => {
     t.addEventListener("click", () => switchTab(t.dataset.tab));
   });
 
   // B50 settings
-  document.getElementById("b50-new-count").addEventListener("change", (e) => {
-    b50NewCount = parseInt(e.target.value, 10);
-    if (allScores.length > 0) renderB50();
+  document.getElementById("b50-versions-latest").addEventListener("click", () => {
+    const versions = getAvailableVersions().slice(0, B50_DEFAULT_NEW_COUNT);
+    setB50NewVersions(versions);
+  });
+  document.getElementById("b50-versions-clear").addEventListener("click", () => {
+    setB50NewVersions([]);
   });
 
   document.getElementById("b50-ignore-newer").addEventListener("change", (e) => {
@@ -1580,6 +1805,8 @@ function handleFile(file) {
       document.getElementById("controls").classList.remove("hidden");
       document.getElementById("table-section").classList.remove("hidden");
       document.getElementById("b50-ignore-label").classList.remove("hidden");
+
+      setupB50VersionPicker();
 
       // Default sort: rating descending
       sortCol = "rating";

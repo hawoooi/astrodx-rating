@@ -38,6 +38,24 @@
         <label><input type="checkbox" value="Master" checked> <span class="diff-master">Master</span></label>
         <label><input type="checkbox" value="Re:Master" checked> <span class="diff-remaster">Re:Master</span></label>
       </div>
+      <div id="level-filter">
+        <span class="lf-label">Level:</span>
+        <span class="level-mode-toggle">
+          <button type="button" data-mode="visible" class="active">Visible</button>
+          <button type="button" data-mode="constant">Constant</button>
+        </span>
+        <span class="level-inputs visible-inputs">
+          <select id="level-min-visible"></select>
+          <span class="lf-dash">–</span>
+          <select id="level-max-visible"></select>
+        </span>
+        <span class="level-inputs constant-inputs hidden">
+          <input type="number" id="level-min-constant" min="1.0" max="15.0" step="0.1" value="1.0">
+          <span class="lf-dash">–</span>
+          <input type="number" id="level-max-constant" min="1.0" max="15.0" step="0.1" value="15.0">
+        </span>
+        <button type="button" id="level-snap" title="Expand the current range to align with visible-level boundaries">Snap to visible</button>
+      </div>
     </section>
 
     <section id="table-section" class="hidden">
@@ -76,15 +94,6 @@
   <div id="tab-b50" class="hidden">
     <section id="b50-settings">
       <div id="b50-version-config">
-        <label>New versions:
-          <select id="b50-new-count">
-            <option value="1">1</option>
-            <option value="2" selected>2</option>
-            <option value="3">3</option>
-            <option value="4">4</option>
-          </select>
-          most recent
-        </label>
         <label id="b50-ignore-label" class="hidden">
           <input type="checkbox" id="b50-ignore-newer"> Ignore charts newer than selected versions
         </label>
@@ -95,7 +104,12 @@
           </select>
         </label>
       </div>
-      <div id="b50-version-list"></div>
+      <div id="b50-new-versions" class="hidden">
+        <span class="bv-label">New chart versions:</span>
+        <div id="b50-version-checks"></div>
+        <button id="b50-versions-latest" type="button" title="Reset to the 2 newest versions">Latest 2</button>
+        <button id="b50-versions-clear" type="button" title="Uncheck all">Clear</button>
+      </div>
       <button id="b50-export" type="button">Export Board as Image</button>
       <span id="b50-exclude-info" class="hidden"></span>
     </section>
